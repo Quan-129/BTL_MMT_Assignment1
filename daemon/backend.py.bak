@@ -79,9 +79,9 @@ def run_backend(ip, port, routes):
     try:
         server.bind((ip, port))
         server.listen(50)
-        print(("[Backend] Listening on port {}".format(port)))
+        print("[Backend] Listening on port {}".format(port))
         if routes != {}:
-            print(("[Backend] route settings {}".format(routes)))
+            print("[Backend] route settings {}".format(routes))
 
         while True:
             conn, addr = server.accept()
@@ -90,18 +90,8 @@ def run_backend(ip, port, routes):
             #        using multi-thread programming with the
             #        provided handle_client routine
             #
-            # tạm
-            # --- BẮT ĐẦU PHẦN SỬA ---
-            # Tạo một luồng mới để xử lý client này
-            client_thread = threading.Thread(
-                target=handle_client, 
-                args=(ip, port, conn, addr, routes)
-            )
-            # Khởi chạy luồng và tiếp tục vòng lặp để chấp nhận client khác
-            client_thread.start()
-            # --- KẾT THÚC PHẦN SỬA ---
     except socket.error as e:
-      print(("Socket error: {}".format(e)))
+      print("Socket error: {}".format(e))
 
 def create_backend(ip, port, routes={}):
     """

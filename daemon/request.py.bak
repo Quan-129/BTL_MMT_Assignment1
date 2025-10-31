@@ -94,7 +94,7 @@ class Request():
 
         # Prepare the request line from the request header
         self.method, self.path, self.version = self.extract_request_line(request)
-        print(("[Request] {} path {} version {}".format(self.method, self.path, self.version)))
+        print("[Request] {} path {} version {}".format(self.method, self.path, self.version))
 
         #
         # @bksysnet Preapring the webapp hook with WeApRous instance
@@ -112,28 +112,10 @@ class Request():
             #
 
         self.headers = self.prepare_headers(request)
-        # cookies = self.headers.get('cookie', '')
+        cookies = self.headers.get('cookie', '')
             #
             #  TODO: implement the cookie function here
             #        by parsing the header            #
-        # --- BẮT ĐẦU PHẦN SỬA ---
-        # Khởi tạo self.cookies là một dictionary rỗng
-        self.cookies = {}
-        # Lấy chuỗi cookie từ header
-        cookie_string = self.headers.get('cookie', '')
-
-        # Phân tích chuỗi cookie nếu nó tồn tại
-        if cookie_string:
-            # Tách các cặp key=value bằng dấu '; '
-            pairs = cookie_string.split('; ')
-            for pair in pairs:
-                # Tách key và value bằng dấu '='
-                if '=' in pair:
-                    key, value = pair.split('=', 1)
-                    self.cookies[key] = value
-        
-        print(f"[Request] Cookies found: {self.cookies}")
-        # --- KẾT THÚC PHẦN SỬA ---
 
         return
 

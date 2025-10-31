@@ -118,11 +118,6 @@ class Response():
         #: is a response.
         self.request = None
 
-        # --- BẮT ĐẦU PHẦN SỬA ---
-        #: Cờ để xác định có cần gửi cookie xác thực hay không
-        self.auth_success = False
-        # --- KẾT THÚC PHẦN SỬA ---
-
 
     def get_mime_type(self, path):
         """
@@ -156,7 +151,7 @@ class Response():
 
         # Processing mime_type based on main_type and sub_type
         main_type, sub_type = mime_type.split('/', 1)
-        print(("[Response] processing MIME main_type={} sub_type={}".format(main_type,sub_type)))
+        print("[Response] processing MIME main_type={} sub_type={}".format(main_type,sub_type))
         if main_type == 'text':
             self.headers['Content-Type']='text/{}'.format(sub_type)
             if sub_type == 'plain' or sub_type == 'css':
@@ -201,19 +196,11 @@ class Response():
 
         filepath = os.path.join(base_dir, path.lstrip('/'))
 
-        print(("[Response] serving the object at location {}".format(filepath)))
+        print("[Response] serving the object at location {}".format(filepath))
             #
             #  TODO: implement the step of fetch the object file
             #        store in the return value of content
             #
-        try:
-            # Mở file ở chế độ đọc nhị phân ('rb') để xử lý được cả text và ảnh
-                with open(filepath, 'rb') as f:
-                    content = f.read()
-        except FileNotFoundError:
-            print(f"[Error] File not found: {filepath}")
-            # Nếu không tìm thấy file, trả về nội dung rỗng và độ dài là 0
-            return 0, b""
         return len(content), content
 
 
@@ -256,21 +243,8 @@ class Response():
             #        header from the provied headers
             #
         #
-         # --- BẮT ĐẦU PHẦN SỬA ---
-        # Kiểm tra cờ auth_success và thêm header Set-Cookie nếu cần
-        if self.auth_success:
-            headers['Set-Cookie'] = 'auth=true'
-            
-        # --- KẾT THÚC PHẦN SỬA ---
-
-        status_line = "HTTP/1.1 200 OK\r\n"
-        
-        # Chuyển đổi dictionary headers thành chuỗi định dạng HTTP
-        header_lines = [f"{key}: {value}" for key, value in headers.items()]
-        fmt_header = status_line + "\r\n".join(header_lines) + "\r\n\r\n"
         # TODO prepare the request authentication
         #
-       
 	# self.auth = ...
         return str(fmt_header).encode('utf-8')
 
@@ -292,21 +266,6 @@ class Response():
                 "\r\n"
                 "404 Not Found"
             ).encode('utf-8')
-    
-    def build_unauthorized(self):
-        """
-        Constructs a standard 401 Unauthorized HTTP response.
-
-        :rtype bytes: Encoded 401 response.
-        """
-        return (
-                "HTTP/1.1 401 Unauthorized\r\n"
-                "Content-Type: text/html\r\n"
-                "Content-Length: 19\r\n"
-                "Connection: close\r\n"
-                "\r\n"
-                "401 Unauthorized"
-            ).encode('utf-8')
 
 
     def build_response(self, request):
@@ -321,7 +280,7 @@ class Response():
         path = request.path
 
         mime_type = self.get_mime_type(path)
-        print(("[Response] {} path {} mime_type {}".format(request.method, request.path, mime_type)))
+        print("[Response] {} path {} mime_type {}".format(request.method, request.path, mime_type))
 
         base_dir = ""
 

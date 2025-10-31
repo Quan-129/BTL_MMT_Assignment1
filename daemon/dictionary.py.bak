@@ -34,7 +34,7 @@ class CaseInsensitiveDict(MutableMapping):
     """
 
     def __init__(self, *args, **kwargs):
-        self.store = {k.lower(): v for k, v in list(dict(*args, **kwargs).items())}
+        self.store = {k.lower(): v for k, v in dict(*args, **kwargs).items()}
 
     def __getitem__(self, key):
         return self.store[key.lower()]

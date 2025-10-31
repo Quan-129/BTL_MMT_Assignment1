@@ -80,74 +80,44 @@ class HttpAdapter:
         #: Response
         self.response = Response()
 
-    # daemon/httpadapter.py
-
     def handle_client(self, conn, addr, routes):
+        """
+        Handle an incoming client connection.
+
+        This method reads the request from the socket, prepares the request object,
+        invokes the appropriate route handler if available, builds the response,
+        and sends it back to the client.
+
+        :param conn (socket): The client socket connection.
+        :param addr (tuple): The client's address.
+        :param routes (dict): The route mapping for dispatching requests.
+        """
+
+        # Connection handler.
         self.conn = conn        
+        # Connection address.
         self.connaddr = addr
+        # Request handler
         req = self.request
+        # Response handler
         resp = self.response
 
-        # Nhận và kiểm tra request rỗng
+        # Handle the request
         msg = conn.recv(1024).decode()
-        if not msg:
-            print("[Info] Received an empty request, closing connection.")
-            conn.close()
-            return
+        req.prepare(msg, routes)
 
-        header_part, _, body_part = msg.partition('\r\n\r\n')
-        req.prepare(header_part, routes)
-        req.body = body_part
-
-        # --- BẮT ĐẦU PHẦN SỬA ---
-
-        # Kiểm tra nếu có hook (API route) khớp với request
+        # Handle request hook
         if req.hook:
-            print("[HttpAdapter] hook in route-path METHOD {} PATH {}".format(req.hook._route_path, req.hook._route_methods))
-            
-            # Gọi hàm API và nhận lại chuỗi JSON
-            json_response_body = req.hook(headers=req.headers, body=req.body)
-            
-            # Xây dựng một response HTTP hoàn chỉnh cho API
-            response_body_bytes = json_response_body.encode('utf-8')
-            status_line = "HTTP/1.1 200 OK\r\n"
-            headers = [
-                "Content-Type: application/json",
-                f"Content-Length: {len(response_body_bytes)}",
-                "Connection: close"
-            ]
-            header_part = "\r\n".join(headers) + "\r\n\r\n"
-            
-            # Kết hợp header và body để tạo response cuối cùng
-            response = status_line.encode('utf-8') + header_part.encode('utf-8') + response_body_bytes
+            print("[HttpAdapter] hook in route-path METHOD {} PATH {}".format(req.hook._route_path,req.hook._route_methods))
+            req.hook(headers = "bksysnet",body = "get in touch")
+            #
+            # TODO: handle for App hook here
+            #
 
-        # Nếu không phải là API, xử lý như logic đăng nhập hoặc file tĩnh
-        else:
-            if req.method == 'POST' and req.path == '/login':
-                params = {}
-                if req.body:
-                    params = dict(p.split('=') for p in req.body.split('&'))
-                username = params.get('username')
-                password = params.get('password')
+        # Build response
+        response = resp.build_response(req)
 
-                if username == 'admin' and password == 'password':
-                    resp.auth_success = True
-                    req.path = '/index.html' 
-                    response = resp.build_response(req)
-                else:
-                    response = resp.build_unauthorized()
-            else:
-                if req.path == '/index.html':
-                    if req.cookies.get('auth') == 'true':
-                        response = resp.build_response(req)
-                    else:
-                        response = resp.build_unauthorized()
-                else:
-                    response = resp.build_response(req)
-
-        # --- KẾT THÚC PHẦN SỬA ---
-
-        # Gửi response và đóng kết nối
+        #print(response)
         conn.sendall(response)
         conn.close()
 
