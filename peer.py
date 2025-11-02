@@ -6,7 +6,7 @@ import uuid # Dùng để tạo ID ngẫu nhiên cho peer
 import threading
 
 # Địa chỉ của máy chủ Tracker
-TRACKER_IP = '172.27.213.32'
+TRACKER_IP = '10.128.6.46'
 TRACKER_PORT = 9999
 
 def register_with_tracker(peer_id, ip, port):
@@ -167,7 +167,7 @@ def broadcast_message(message, current_peer_list):
 if __name__ == "__main__":
     # Thông tin của peer này
     MY_ID = f"peer_{uuid.uuid4().hex[:6]}"
-    MY_IP = '172.27.213.32'
+    MY_IP = '10.128.6.46'
     MY_PORT = int(input("Nhập port bạn muốn peer này lắng nghe (ví dụ: 9001, 9002,...): "))
 
     print(f"--- Bắt đầu Peer: {MY_ID} tại {MY_IP}:{MY_PORT} ---")
