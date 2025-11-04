@@ -67,8 +67,8 @@ def forward_request(host, port, request):
             response += chunk
         return response
     except socket.error as e:
-      print(("Socket error: {}".format(e)))
-      return (
+        print(("Socket error: {}".format(e)))
+        return (
             "HTTP/1.1 404 Not Found\r\n"
             "Content-Type: text/plain\r\n"
             "Content-Length: 13\r\n"
@@ -89,31 +89,34 @@ def resolve_routing_policy(hostname, routes):
     """
 
     print(hostname)
-    proxy_map, policy = routes.get(hostname,('127.0.0.1:9000','round-robin'))
+    proxy_map, policy = routes.get(hostname, ('127.0.0.1:9000', 'round-robin'))
     print(proxy_map)
     print(policy)
 
     proxy_host = ''
     proxy_port = '9000'
-    if isinstance(proxy_map, list):
+    
+    # Handle the tuple case from get() default value or non-list configuration
+    if isinstance(proxy_map, tuple):
+        proxy_host, proxy_port = proxy_map[0].split(":", 2) if isinstance(proxy_map[0], str) else proxy_map[0].split(":", 2)
+        
+    elif isinstance(proxy_map, list):
         if len(proxy_map) == 0:
             print(("[Proxy] Emtpy resolved routing of hostname {}".format(hostname)))
             print("Empty proxy_map result")
             # TODO: implement the error handling for non mapped host
-            #       the policy is design by team, but it can be 
-            #       basic default host in your self-defined system
             # Use a dummy host to raise an invalid connection
             proxy_host = '127.0.0.1'
             proxy_port = '9000'
-        elif len(value) == 1:
+        # Lỗi len(value) đã được đổi thành len(proxy_map)
+        elif len(proxy_map) == 1: 
             proxy_host, proxy_port = proxy_map[0].split(":", 2)
         #elif: # apply the policy handling 
         #   proxy_map
         #   policy
         else:
-            # Out-of-handle mapped host
-            proxy_host = '127.0.0.1'
-            proxy_port = '9000'
+            # Out-of-handle mapped host, dùng host đầu tiên trong list
+            proxy_host, proxy_port = proxy_map[0].split(":", 2)
     else:
         print(("[Proxy] resolve route of hostname {} is a singulair to".format(hostname)))
         proxy_host, proxy_port = proxy_map.split(":", 2)
@@ -138,38 +141,54 @@ def handle_client(ip, port, conn, addr, routes):
     :params addr (tuple): client address (IP, port).
     :params routes (dict): dictionary mapping hostnames and location.
     """
-
-    request = conn.recv(1024).decode()
-
-    # Extract hostname
-    for line in request.splitlines():
-        if line.lower().startswith('host:'):
-            hostname = line.split(':', 1)[1].strip()
-
-    print(("[Proxy] {} at Host: {}".format(addr, hostname)))
-
-    # Resolve the matching destination in routes and need conver port
-    # to integer value
-    resolved_host, resolved_port = resolve_routing_policy(hostname, routes)
+    # LƯU Ý: Khối này không sử dụng HttpAdapter mà dùng socket thô để forwarding.
+    
+    # Do request có thể rỗng, nên đặt trong try/except.
     try:
-        resolved_port = int(resolved_port)
-    except ValueError:
-        print("Not a valid integer")
+        request = conn.recv(4096).decode(errors='ignore')
+        if not request:
+            conn.close()
+            return
+            
+        hostname = ""
 
-    if resolved_host:
-        print(("[Proxy] Host name {} is forwarded to {}:{}".format(hostname,resolved_host, resolved_port)))
-        response = forward_request(resolved_host, resolved_port, request)        
-    else:
-        response = (
-            "HTTP/1.1 404 Not Found\r\n"
-            "Content-Type: text/plain\r\n"
-            "Content-Length: 13\r\n"
-            "Connection: close\r\n"
-            "\r\n"
-            "404 Not Found"
-        ).encode('utf-8')
-    conn.sendall(response)
-    conn.close()
+        # Extract hostname
+        for line in request.splitlines():
+            if line.lower().startswith('host:'):
+                hostname = line.split(':', 1)[1].strip()
+                break # Tìm thấy Host, thoát sớm
+
+        print(("[Proxy] {} at Host: {}".format(addr, hostname)))
+
+        # Resolve the matching destination in routes and need conver port
+        # to integer value
+        resolved_host, resolved_port = resolve_routing_policy(hostname, routes)
+        
+        try:
+            resolved_port = int(resolved_port)
+        except ValueError:
+            print("Not a valid integer port, defaulting to 9000.")
+            resolved_port = 9000
+
+        if resolved_host:
+            print(("[Proxy] Host name {} is forwarded to {}:{}".format(hostname,resolved_host, resolved_port)))
+            response = forward_request(resolved_host, resolved_port, request) 
+        else:
+            response = (
+                "HTTP/1.1 404 Not Found\r\n"
+                "Content-Type: text/plain\r\n"
+                "Content-Length: 13\r\n"
+                "Connection: close\r\n"
+                "\r\n"
+                "404 Not Found"
+            ).encode('utf-8')
+            
+        conn.sendall(response)
+        
+    except Exception as e:
+        print(f"[Proxy Handle Error] {e}")
+    finally:
+        conn.close()
 
 def run_proxy(ip, port, routes):
     """
@@ -178,7 +197,7 @@ def run_proxy(ip, port, routes):
     The process dinds the proxy server to the specified IP and port.
     In each incomping connection, it accepts the connections and
     spawns a new thread for each client using `handle_client`.
- 
+    
 
     :params ip (str): IP address to bind the proxy server.
     :params port (int): port number to listen on.
@@ -187,6 +206,9 @@ def run_proxy(ip, port, routes):
     """
 
     proxy = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    
+    # ✅ FIX: Thiết lập SO_REUSEADDR để tránh lỗi Address already in use khi khởi động lại
+    proxy.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
     try:
         proxy.bind((ip, port))
@@ -195,12 +217,19 @@ def run_proxy(ip, port, routes):
         while True:
             conn, addr = proxy.accept()
             #
-            #  TODO: implement the step of the client incomping connection
-            #        using multi-thread programming with the
-            #        provided handle_client routine
+            # ✅ FIX: Implement Multi-threading (Giải quyết TODO)
+            #        using multi-thread programming with the
+            #        provided handle_client routine
             #
+            client_thread = threading.Thread(
+                target=handle_client,
+                args=(ip, port, conn, addr, routes)
+            )
+            client_thread.daemon = True
+            client_thread.start()
+            
     except socket.error as e:
-      print(("Socket error: {}".format(e)))
+        print(("Socket error: {}".format(e)))
 
 def create_proxy(ip, port, routes):
     """

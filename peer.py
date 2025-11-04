@@ -167,7 +167,11 @@ def broadcast_message(message, current_peer_list):
 if __name__ == "__main__":
     # Thông tin của peer này
     MY_ID = f"peer_{uuid.uuid4().hex[:6]}"
+<<<<<<< Updated upstream
     MY_IP = '10.128.6.46'
+=======
+    MY_IP = '127.0.0.1'
+>>>>>>> Stashed changes
     MY_PORT = int(input("Nhập port bạn muốn peer này lắng nghe (ví dụ: 9001, 9002,...): "))
 
     print(f"--- Bắt đầu Peer: {MY_ID} tại {MY_IP}:{MY_PORT} ---")

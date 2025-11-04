@@ -55,7 +55,8 @@ def parse_virtual_hosts(config_file):
     :rtype list of dict: Each dict contains 'listen'and 'server_name'.
     """
 
-    with open(config_file, 'r') as f:
+    # ✅ FIX: Chỉ định mã hóa UTF-8 để tránh UnicodeDecodeError
+    with open(config_file, 'r', encoding='utf-8') as f:
         config_text = f.read()
 
     # Match each host block
@@ -69,15 +70,15 @@ def parse_virtual_hosts(config_file):
 
         # Find all proxy_pass entries
         proxy_passes = re.findall(r'proxy_pass\s+http://([^\s;]+);', block)
-        map = proxy_map.get(host,[])
-        map = map + proxy_passes
-        proxy_map[host] = map
+        map_list = proxy_map.get(host, [])
+        map_list = map_list + proxy_passes
+        proxy_map[host] = map_list
 
         # Find dist_policy if present
         policy_match = re.search(r'dist_policy\s+(\w+)', block)
         if policy_match:
             dist_policy_map = policy_match.group(1)
-        else: #default policy is round_robin
+        else:  # default policy is round_robin
             dist_policy_map = 'round-robin'
             
         #
@@ -88,13 +89,15 @@ def parse_virtual_hosts(config_file):
         #       the policy is applied to identify the highes matching
         #       proxy_pass
         #
-        if len(proxy_map.get(host,[])) == 1:
-            routes[host] = (proxy_map.get(host,[])[0], dist_policy_map)
+        proxy_pass_list = proxy_map.get(host, [])
+        
+        if len(proxy_pass_list) == 1:
+            routes[host] = (proxy_pass_list[0], dist_policy_map)
         # esle if:
-        #         TODO:  apply further policy matching here
+        #           TODO:   apply further policy matching here
         #
         else:
-            routes[host] = (proxy_map.get(host,[]), dist_policy_map)
+            routes[host] = (proxy_pass_list, dist_policy_map)
 
     for key, value in list(routes.items()):
         print(key, value)
