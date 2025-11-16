@@ -87,70 +87,134 @@ class HttpAdapter:
         self.connaddr = addr
         req = self.request
         resp = self.response
+        response = None
 
         # Nhận và kiểm tra request rỗng
-        msg = conn.recv(1024).decode()
+        try:
+            # Tăng kích thước buffer lên 4096 để đảm bảo nhận đủ headers và body
+            msg = conn.recv(4096).decode()
+        except ConnectionResetError:
+            print("[Error] Connection reset by client.")
+            return
+            
         if not msg:
             print("[Info] Received an empty request, closing connection.")
             conn.close()
             return
 
         header_part, _, body_part = msg.partition('\r\n\r\n')
+        
+        # 1. Chuẩn bị Request và Body
+        # Lấy cookies từ headers và gán vào req.cookies (quan trọng cho Task 1B)
+        req.cookies = self.get_request_cookies(req) 
         req.prepare(header_part, routes)
         req.body = body_part
 
-        # --- BẮT ĐẦU PHẦN SỬA ---
-
-        # Kiểm tra nếu có hook (API route) khớp với request
+        # --- BẮT ĐẦU LOGIC SỬA CHO TASK 1 & TASK 2 ---
+        
+        # 2. Kiểm tra nếu có hook (API route) khớp với request (Task 2: WeApRous)
         if req.hook:
             print("[HttpAdapter] hook in route-path METHOD {} PATH {}".format(req.hook._route_path, req.hook._route_methods))
             
-            # Gọi hàm API và nhận lại chuỗi JSON
+            # Giả định hàm hook trả về chuỗi/dict/json hợp lệ
             json_response_body = req.hook(headers=req.headers, body=req.body)
             
-            # Xây dựng một response HTTP hoàn chỉnh cho API
-            response_body_bytes = json_response_body.encode('utf-8')
+            # Xây dựng response HTTP cho API (giữ nguyên logic bạn đã viết)
+            if isinstance(json_response_body, dict):
+                response_body_bytes = json.dumps(json_response_body).encode('utf-8')
+                content_type = "application/json"
+            else: 
+                response_body_bytes = str(json_response_body).encode('utf-8')
+                content_type = "application/octet-stream" 
+
             status_line = "HTTP/1.1 200 OK\r\n"
             headers = [
-                "Content-Type: application/json",
+                f"Content-Type: {content_type}",
                 f"Content-Length: {len(response_body_bytes)}",
                 "Connection: close"
             ]
             header_part = "\r\n".join(headers) + "\r\n\r\n"
-            
-            # Kết hợp header và body để tạo response cuối cùng
             response = status_line.encode('utf-8') + header_part.encode('utf-8') + response_body_bytes
 
-        # Nếu không phải là API, xử lý như logic đăng nhập hoặc file tĩnh
+        # 3. Xử lý Logic đăng nhập và Access Control (Task 1)
         else:
-            if req.method == 'POST' and req.path == '/login':
+            current_path = req.path
+            is_authenticated = req.cookies.get('auth') == 'true'
+
+            # --- TASK 1A: Xử lý POST /login ---
+            if req.method == 'POST' and current_path == '/login':
                 params = {}
                 if req.body:
-                    params = dict(p.split('=') for p in req.body.split('&'))
+                    # Parse body kiểu application/x-www-form-urlencoded
+                    params = dict(p.split('=', 1) for p in req.body.split('&') if '=' in p)
+                
                 username = params.get('username')
                 password = params.get('password')
 
                 if username == 'admin' and password == 'password':
-                    resp.auth_success = True
+                    # Đăng nhập thành công -> Set-Cookie và chuyển hướng đến /index.html
+                    print("[Login Success] Setting auth=true cookie and redirecting.")
+                    
+                    # *** ĐIỂM SỬA QUAN TRỌNG: Gọi hàm set_cookie để thêm Set-Cookie header ***
+                    resp.set_cookie('auth', 'true') 
+                    
+                    # Cập nhật đường dẫn để serve trang index
                     req.path = '/index.html' 
                     response = resp.build_response(req)
                 else:
+                    # Đăng nhập thất bại -> 401 Unauthorized
+                    print("[Login Fail] Responding with 401 Unauthorized.")
                     response = resp.build_unauthorized()
-            else:
-                if req.path == '/index.html':
-                    if req.cookies.get('auth') == 'true':
-                        response = resp.build_response(req)
-                    else:
-                        response = resp.build_unauthorized()
-                else:
+                    
+            # --- TASK 1B: Xử lý Access Control cho / và /index.html ---
+            elif req.method == 'GET' and (current_path == '/' or current_path == '/index.html'):
+                
+                if is_authenticated:
+                    # Nếu truy cập / -> chuyển hướng nội bộ sang /index.html
+                    if current_path == '/':
+                        req.path = '/index.html'
+                    
+                    print(f"[Access Granted] Serving {req.path}.")
                     response = resp.build_response(req)
-
-        # --- KẾT THÚC PHẦN SỬA ---
-
+                else:
+                    # Nếu chưa xác thực -> 401 Unauthorized
+                    print(f"[Access Denied] No auth cookie for {current_path}, responding with 401.")
+                    response = resp.build_unauthorized()
+                    
+            # 4. Xử lý các request file tĩnh khác (CSS, JS, images, login.html)
+            else:
+                # Các file tĩnh còn lại không cần bảo vệ
+                response = resp.build_response(req)
+        
+        # --- KẾT THÚC LOGIC SỬA ---
+        
         # Gửi response và đóng kết nối
-        conn.sendall(response)
+        if response:
+            conn.sendall(response)
+        
         conn.close()
-
+    
+    def get_request_cookies(self, req):
+        """
+        Extracts cookies from the request headers.
+        """
+        cookies = {}
+        
+        # *** ĐIỂM SỬA: Kiểm tra req.headers có tồn tại (không phải None) trước khi gọi .get() ***
+        if req.headers is None:
+            return cookies
+            
+        cookie_header = req.headers.get('Cookie') 
+        if cookie_header:
+            for pair in cookie_header.split(';'):
+                try:
+                    # Split only on the first '='
+                    key, value = pair.strip().split('=', 1) 
+                    cookies[key] = value
+                except ValueError:
+                    continue 
+        return cookies
+    
     @property
     def extract_cookies(self, req, resp):
         """
@@ -259,3 +323,6 @@ class HttpAdapter:
             headers["Proxy-Authorization"] = (username, password)
 
         return headers
+    
+
+    

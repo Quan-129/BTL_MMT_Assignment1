@@ -1,20 +1,27 @@
-# peer.py
-
 import socket
 import json
 import uuid # Dùng để tạo ID ngẫu nhiên cho peer
 import threading
+import os
+import time
+import sys
 
-# Địa chỉ của máy chủ Tracker
-TRACKER_IP = '10.128.6.46'
-TRACKER_PORT = 9999
+# CẤU HÌNH IP VÀ PORT
+# QUAN TRỌNG: Dùng 127.0.0.1 để đảm bảo có thể chạy nhiều peer trên cùng một máy local
+TRACKER_IP = '127.0.0.1'
+# TRACKER_IP = '10.128.8.89'
+TRACKER_PORT = 9999 # Port phải khớp với start_tracker.py
 
-def register_with_tracker(peer_id, ip, port):
+# Dictionary để lưu trữ các peer đang hoạt động, được cập nhật từ Tracker.
+# Format: { "peer_id (username@ip:port)": {"ip": "127.0.0.1", "port": 1234, "username": "userX"} }
+PEER_MAP = {} 
+
+def register_with_tracker(username, ip, port):
     """Gửi thông tin đăng ký đến máy chủ Tracker."""
     
     # 1. Chuẩn bị dữ liệu để gửi đi
     data = {
-        "peer_id": peer_id,
+        "peer_id": username, # Tracker dùng username làm key
         "ip": ip,
         "port": port
     }
@@ -33,23 +40,35 @@ def register_with_tracker(peer_id, ip, port):
     request = "\r\n".join(request_lines)
 
     # 3. Gửi request đến Tracker
-    # --- BẮT ĐẦU PHẦN SỬA ---
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((TRACKER_IP, TRACKER_PORT))
             s.sendall(request.encode('utf-8'))
-            response = s.recv(1024).decode('utf-8')
-            print("[Client] Phản hồi từ Tracker (Đăng ký):")
-            print(response)
+            
+            # Nhận phản hồi
+            response_raw = b""
+            while True:
+                chunk = s.recv(1024)
+                if not chunk:
+                    break
+                response_raw += chunk
+            
+            response = response_raw.decode('utf-8')
+            print("[Client] Phản hồi từ Tracker (Đăng ký):\n" + response.split('\r\n\r\n', 1)[0])
+            
+            # Trả về True nếu đăng ký thành công (dựa trên Status Line)
+            return response.startswith("HTTP/1.1 200 OK")
+            
     except ConnectionRefusedError:
         print(f"[Client] Lỗi: Không thể kết nối đến Tracker tại {TRACKER_IP}:{TRACKER_PORT}. Hãy đảm bảo Tracker đang chạy.")
     except Exception as e:
         print(f"[Client] Lỗi không xác định khi đăng ký với Tracker: {e}")
-    # --- KẾT THÚC PHẦN SỬA ---
+    return False
 
 def get_peer_list():
-    """Yêu cầu danh sách các peer đang hoạt động từ Tracker."""
-
+    """Yêu cầu danh sách các peer đang hoạt động từ Tracker và cập nhật PEER_MAP."""
+    global PEER_MAP
+    
     # 1. Xây dựng một request HTTP GET thô (raw)
     request_lines = [
         f"GET /get-list HTTP/1.1",
@@ -61,71 +80,114 @@ def get_peer_list():
     request = "\r\n".join(request_lines)
     
     # 2. Gửi request và nhận phản hồi
-    # --- BẮT ĐẦU PHẦN SỬA ---
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((TRACKER_IP, TRACKER_PORT))
             s.sendall(request.encode('utf-8'))
-            response_raw = s.recv(1024).decode('utf-8')
             
-            header_part, _, body_part = response_raw.partition('\r\n\r\n')
-            peer_list = json.loads(body_part)
+            response_raw = b""
+            while True:
+                chunk = s.recv(1024)
+                if not chunk:
+                    break
+                response_raw += chunk
             
+            response = response_raw.decode('utf-8')
+            
+            # Tách Header và Body
+            header_part, _, body_part = response.partition('\r\n\r\n')
+            
+            # Kiểm tra trạng thái HTTP
+            if not header_part.startswith("HTTP/1.1 200 OK"):
+                 print(f"[Client] Lỗi khi lấy danh sách peer: {header_part.splitlines()[0]}")
+                 return None
+
+            # Parse JSON body
+            data = json.loads(body_part)
+            
+            # Cập nhật PEER_MAP: Key là Peer ID đầy đủ (username@ip:port)
+            new_map = {}
+            for peer_info in data.get('peers', []):
+                # FIX: Sử dụng Peer ID đầy đủ làm Key
+                peer_id_full = f"{peer_info['username']}@{peer_info['ip']}:{peer_info['port']}"
+                new_map[peer_id_full] = peer_info
+                
+            PEER_MAP = new_map
+
             print("[Client] Danh sách peer nhận được:")
-            print(peer_list)
-            return peer_list
+            for peer_id, info in PEER_MAP.items():
+                 print(f" 	- ID: {peer_id} | IP: {info['ip']} | Port: {info['port']}")
+            print(f"[Client] Tổng cộng {len(PEER_MAP)} peer.")
+            
+            return PEER_MAP
+            
     except ConnectionRefusedError:
         print(f"[Client] Lỗi: Không thể kết nối đến Tracker tại {TRACKER_IP}:{TRACKER_PORT}. Hãy đảm bảo Tracker đang chạy.")
+        return None
+    except json.JSONDecodeError:
+        print(f"[Client] Lỗi: Phản hồi từ Tracker không phải là JSON hợp lệ.")
         return None
     except Exception as e:
         print(f"[Client] Lỗi không xác định khi lấy danh sách peer: {e}")
         return None
-    # --- KẾT THÚC PHẦN SỬA ---
     
 def handle_peer_connection(conn, addr):
     """Xử lý kết nối từ một peer khác."""
     try:
         print(f"\n[Server Peer] Có kết nối từ {addr}")
         while True:
-            message = conn.recv(1024).decode('utf-8')
-            if not message:
+            # Nhận dữ liệu dưới dạng bytes
+            message_bytes = conn.recv(1024) 
+            if not message_bytes:
                 break
-            # --- BẮT ĐẦU PHẦN SỬA ---
-            # In tin nhắn đến một cách rõ ràng
+            
+            # Giải mã và in tin nhắn
+            message = message_bytes.decode('utf-8')
             print(f"\n<<< Tin nhắn từ {addr[0]}:{addr[1]}]: {message}")
+            
             # In lại dấu nhắc lệnh để người dùng biết họ có thể gõ tiếp
             print("Nhập lệnh > ", end="", flush=True)
-            # --- KẾT THÚC PHẦN SỬA ---
+            
     except Exception as e:
-        print(f"[Server Peer] Lỗi kết nối: {e}")
+        print(f"\n[Server Peer] Lỗi kết nối: {e}")
     finally:
-        print(f"[Server Peer] Đã đóng kết nối từ {addr}")
+        print(f"\n[Server Peer] Đã đóng kết nối từ {addr}")
+        print("Nhập lệnh > ", end="", flush=True)
         conn.close()
 
 def peer_server_thread(ip, port):
     """Luồng chạy server để lắng nghe kết nối từ các peer khác."""
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind((ip, port))
+    try:
+        server.bind((ip, port))
+    except OSError as e:
+        print(f"[LỖI FATAL] Không thể bind port {port}. Có thể port đã được sử dụng. Hãy thử port khác.")
+        os._exit(1) # Thoát hẳn chương trình
+        
     server.listen(5) # Cho phép tối đa 5 kết nối chờ
     print(f"[Server Peer] Đang lắng nghe trên port {port}...")
 
     while True:
-        conn, addr = server.accept()
-        # Khi có kết nối mới, tạo một luồng riêng để xử lý
-        client_handler = threading.Thread(
-            target=handle_peer_connection,
-            args=(conn, addr)
-        )
-        client_handler.start()
+        try:
+            conn, addr = server.accept()
+            # Khi có kết nối mới, tạo một luồng riêng để xử lý
+            client_handler = threading.Thread(
+                target=handle_peer_connection,
+                args=(conn, addr)
+            )
+            client_handler.start()
+        except Exception as e:
+            print(f"[Server Peer Thread] Lỗi khi chấp nhận kết nối: {e}")
+            break
 
-def send_message_to_peer(peer_id, message, peer_list):
+def send_message_to_peer(peer_id_full, message, peer_list):
     """Kết nối và gửi tin nhắn đến một peer cụ thể."""
     
-    # 1. Tra cứu thông tin của peer đích
-    target_peer_info = peer_list.get(peer_id)
+    # 1. Tra cứu thông tin của peer đích (Dùng Peer ID đầy đủ làm Key)
+    target_peer_info = peer_list.get(peer_id_full)
     
     if not target_peer_info:
-        print(f"[Client] Lỗi: Không tìm thấy peer với ID '{peer_id}'. Hãy dùng lệnh 'list' để cập nhật.")
+        print(f"[Client] Lỗi: Không tìm thấy peer với ID '{peer_id_full}'. Hãy dùng lệnh 'list' để cập nhật.")
         return
 
     target_ip = target_peer_info['ip']
@@ -135,91 +197,109 @@ def send_message_to_peer(peer_id, message, peer_list):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((target_ip, target_port))
+            # Gửi tin nhắn
             s.sendall(message.encode('utf-8'))
-            print(f"[Client] Đã gửi tin nhắn đến {peer_id}.")
+            print(f"[Client] Đã gửi tin nhắn đến {peer_id_full}.")
     except ConnectionRefusedError:
-        print(f"[Client] Lỗi: Không thể kết nối đến {peer_id}. Peer có thể đã offline.")
+        print(f"[Client] Lỗi: Không thể kết nối đến {peer_id_full}. Peer có thể đã offline hoặc port bị chặn.")
     except Exception as e:
         print(f"[Client] Lỗi không xác định khi gửi tin nhắn: {e}")
 
-def broadcast_message(message, current_peer_list):
+def broadcast_message(message):
     """Gửi một tin nhắn đến tất cả các peer trong danh sách, trừ chính mình."""
+    global MY_ID, PEER_MAP
     
     print("\n--- Đang gửi broadcast đến tất cả các peer... ---")
     
-    # Lấy danh sách mới nhất trước khi gửi để đảm bảo cập nhật
-    latest_peer_list = get_peer_list()
-    if not latest_peer_list:
-        print("[Client] Không thể lấy danh sách peer. Đã hủy broadcast.")
-        return
-
+    # 1. Cập nhật danh sách mới nhất
+    get_peer_list()
+    latest_peer_list = PEER_MAP # Sử dụng PEER_MAP đã được cập nhật
+    
     if len(latest_peer_list) <= 1:
         print("[Client] Không có peer nào khác để gửi broadcast.")
         return
 
-    # Lặp qua tất cả các peer trong danh sách mới nhất
-    for peer_id, info in latest_peer_list.items():
+    # 2. Lặp qua tất cả các peer trong danh sách mới nhất
+    for peer_id_full in latest_peer_list.keys():
         # Không gửi tin nhắn cho chính mình
-        if peer_id != MY_ID:
-            send_message_to_peer(peer_id, message, latest_peer_list)
-
+        if peer_id_full != MY_ID:
+            # Gửi tin nhắn, truyền PEER_MAP (để send_message_to_peer tra cứu)
+            send_message_to_peer(peer_id_full, f"[BROADCAST] {message}", latest_peer_list)
 
 if __name__ == "__main__":
-    # Thông tin của peer này
-    MY_ID = f"peer_{uuid.uuid4().hex[:6]}"
-<<<<<<< Updated upstream
-    MY_IP = '10.128.6.46'
-=======
-    MY_IP = '127.0.0.1'
->>>>>>> Stashed changes
-    MY_PORT = int(input("Nhập port bạn muốn peer này lắng nghe (ví dụ: 9001, 9002,...): "))
+    
+    # TẠO ID DUY NHẤT: username + id ngắn + IP + PORT (sẽ được input)
+    username = input("Nhập username cho peer này: ")
+    
+    # Cần import os nếu muốn dùng os._exit(1)
+    
+    # Tên của peer này
+    PEER_UID = uuid.uuid4().hex[:6]
+    
+    # MY_IP = '10.128.8.89'
+    MY_IP = '127.0.0.1'   
+    try:
+        MY_PORT = int(input("Nhập port bạn muốn peer này lắng nghe (ví dụ: 9001, 9002,...): "))
+    except ValueError:
+        print("Port phải là số nguyên!")
+        os._exit(1)
+    
+    MY_ID = f"{username}@{MY_IP}:{MY_PORT}"
 
-    print(f"--- Bắt đầu Peer: {MY_ID} tại {MY_IP}:{MY_PORT} ---")
+    print(f"--- Bắt đầu Peer: {MY_ID} ---")
 
     # 1. Khởi chạy server lắng nghe trong một luồng nền
     server_thread = threading.Thread(target=peer_server_thread, args=(MY_IP, MY_PORT))
     server_thread.daemon = True
     server_thread.start()
 
+    # Chờ 1 giây để server bind port
+    time.sleep(1)
+
     # 2. Đăng ký với Tracker
     print("\n--- Đang đăng ký với Tracker... ---")
-    register_with_tracker(MY_ID, MY_IP, MY_PORT)
-
+    if register_with_tracker(username, MY_IP, MY_PORT):
+        print("Đăng ký thành công.")
+    else:
+        print("Đăng ký thất bại. Vui lòng kiểm tra Tracker (9999).")
+        
     print("\n--- Peer đã sẵn sàng. Gõ 'list', 'send <id> <msg>', 'broadcast <msg>', hoặc 'exit'. ---")
-    active_peers = {} 
+    
+    # Cập nhật danh sách peer lần đầu
+    get_peer_list()
 
     while True:
-        command = input("Nhập lệnh > ")
-        # Tách lệnh và nội dung tin nhắn
+        try:
+            command = input("Nhập lệnh > ")
+        except EOFError:
+            break
+            
         parts = command.split(" ", 1)
         cmd = parts[0].lower()
         
         if cmd == 'list':
             print("\n--- Đang lấy danh sách peer cập nhật... ---")
-            active_peers = get_peer_list()
+            get_peer_list()
         
         elif cmd == 'send':
-            # ... (logic gửi tin nhắn trực tiếp của Ngày 5 giữ nguyên)
             send_parts = command.split(" ", 2)
             if len(send_parts) < 3:
-                print("Lỗi: Cú pháp lệnh là 'send <peer_id> <message>'")
+                print("Lỗi: Cú pháp lệnh là 'send <peer_id> <message>' (peer_id: username@ip:port)")
             else:
                 peer_id = send_parts[1]
                 message = send_parts[2]
-                send_message_to_peer(peer_id, message, active_peers)
+                send_message_to_peer(peer_id, message, PEER_MAP)
 
-        # --- BẮT ĐẦU PHẦN SỬA ---
         elif cmd == 'broadcast':
             if len(parts) < 2:
                 print("Lỗi: Cú pháp lệnh là 'broadcast <message>'")
             else:
                 message = parts[1]
-                # Gọi hàm broadcast (sẽ được tạo ở bước tiếp theo)
-                broadcast_message(message, active_peers)
-        # --- KẾT THÚC PHẦN SỬA ---
+                broadcast_message(message)
 
         elif cmd == 'exit':
             print("--- Tạm biệt! ---")
             break
+        
         else:
-            print(f"Lệnh '{cmd}' không hợp lệ.")
+            print(f"Lệnh '{cmd}' không hợp lệ. Dùng 'list', 'send', 'broadcast', 'exit'.")

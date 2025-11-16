@@ -42,7 +42,7 @@ class Response():
     :attrs status_code (int): HTTP status code (e.g., 200, 404).
     :attrs headers (dict): dictionary of response headers.
     :attrs url (str): url of the response.
-    :attrsencoding (str): encoding used for decoding response content.
+    :attrsencoding (str): encoding used for decoding response text.
     :attrs history (list): list of previous Response objects (for redirects).
     :attrs reason (str): textual reason for the status code (e.g., "OK", "Not Found").
     :attrs cookies (CaseInsensitiveDict): response cookies.
@@ -91,7 +91,7 @@ class Response():
         self.status_code = 200 # Khởi tạo mặc định
         
         #: Case-insensitive Dictionary of Response Headers.
-        self.headers = {}
+        self.headers = CaseInsensitiveDict() # Sử dụng CaseInsensitiveDict cho headers
 
         #: URL location of Response.
         self.url = None
@@ -104,7 +104,7 @@ class Response():
         self.history = []
 
         #: Textual reason of responded HTTP Status, e.g. "Not Found" or "OK".
-        self.reason = None
+        self.reason = "OK" # Khởi tạo mặc định
 
         #: A of Cookies the response headers.
         self.cookies = CaseInsensitiveDict()
@@ -114,12 +114,24 @@ class Response():
 
         #: The :class:`PreparedRequest <PreparedRequest>` object to which this
         #: is a response.
-        self.request = None
+        self.request = request
 
-        # ✅ FIX: Đổi tên biến để khớp với httpadapter.py
-        self.cookie_flag = False 
+        # ✅ FIX: Thuộc tính để lưu trữ cookies cần Set-Cookie (Task 1A)
+        self.cookies_to_set = CaseInsensitiveDict() 
         self._header_sent = False # Cờ kiểm tra header đã được gửi chưa
 
+    # ✅ FIX: Phương thức set_cookie để HttpAdapter gọi (Task 1A)
+    def set_cookie(self, key, value, path='/', max_age=None):
+        """Lưu một cookie để đưa vào Set-Cookie header."""
+        cookie_parts = [f"{key}={value}"]
+        cookie_parts.append(f"Path={path}")
+        
+        if max_age is not None:
+            # max_age phải là số nguyên (giây)
+            cookie_parts.append(f"Max-Age={max_age}")
+
+        # Lưu chuỗi cookie thô vào bộ lưu trữ
+        self.cookies_to_set[key] = "; ".join(cookie_parts)
 
     def get_mime_type(self, path):
         """
@@ -156,12 +168,11 @@ class Response():
         print(("[Response] processing MIME main_type={} sub_type={}".format(main_type,sub_type)))
         if main_type == 'text':
             self.headers['Content-Type']='text/{}'.format(sub_type)
-            if sub_type == 'plain' or sub_type == 'css':
+            if sub_type == 'plain' or sub_type == 'css' or sub_type == 'javascript':
                 base_dir = BASE_DIR+"static/"
             elif sub_type == 'html':
                 base_dir = BASE_DIR+"www/"
             else:
-                # ✅ FIX: Xóa hàm handle_text_other không tồn tại
                 base_dir = BASE_DIR+"static/" 
         elif main_type == 'image':
             base_dir = BASE_DIR+"static/"
@@ -170,7 +181,7 @@ class Response():
             base_dir = BASE_DIR+"apps/"
             self.headers['Content-Type']='application/{}'.format(sub_type)
         #
-        #  TODO: process other mime_type
+        #   TODO: process other mime_type
         #
         else:
             raise ValueError("Invalid MEME type: main_type={} sub_type={}".format(main_type,sub_type))
@@ -198,9 +209,8 @@ class Response():
                 content = f.read()
         except FileNotFoundError:
             print(f"[Error] File not found: {filepath}")
-            # Trả về nội dung 404 để build_response biết mà gọi build_notfound
-            content = b"404 Not Found" 
-            return 0, content # Trả về 0 và nội dung lỗi
+            # Trả về nội dung lỗi để build_response biết mà gọi build_notfound
+            return 0, b"404 Not Found"
             
         return len(content), content
 
@@ -214,38 +224,32 @@ class Response():
 
         :rtypes bytes: encoded HTTP response header.
         """
-        reqhdr = request.headers
-        
-        # Build dynamic headers (LƯU Ý: Đã dùng len(self._content) ở đây)
-        headers = {
-            "Accept": reqhdr.get("Accept", "application/json"),
-            "Accept-Language": reqhdr.get("Accept-Language", "en-US,en;q=0.9"),
-            "Authorization": reqhdr.get("Authorization", "Basic <credentials>"),
-            "Cache-Control": "no-cache",
-            "Content-Type": self.headers.get('Content-Type', 'text/html'),
-            "Content-Length": len(self._content), # FIX: Phải là số, nhưng sẽ được convert ở dưới
-            "Date": datetime.datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT"),
-            "Max-Forward": "10",
-            "Pragma": "no-cache",
-            "Proxy-Authorization": "Basic dXNlcjpwYXNz",
-            "Warning": "199 Miscellaneous warning",
-            "User-Agent": reqhdr.get("User-Agent", "Chrome/123.0.0.0"),
-        }
+        # Nếu chưa set Content-Length, set nó bằng độ dài nội dung
+        if 'Content-Length' not in self.headers and self._content is not False:
+             self.headers['Content-Length'] = len(self._content)
 
-        # --- Logic Set-Cookie (Task 1A) ---
-        if self.cookie_flag:
-            # FIX: Thêm Set-Cookie vào headers.
-            headers['Set-Cookie'] = 'auth=true; Path=/'
-            
-        # Dòng trạng thái HTTP (200 OK)
-        status_line = "HTTP/1.1 200 OK\r\n"
+        # Cập nhật trạng thái và lý do (dùng self.status_code và self.reason)
+        status_line = f"HTTP/1.1 {self.status_code} {self.reason}\r\n"
+        header_lines = []
+
+        # Thêm các header chuẩn (giữ nguyên các header động/tĩnh cần thiết)
+        # Khởi tạo headers mặc định nếu chưa có
+        if not self.headers.get('Date'):
+            self.headers['Date'] = datetime.datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
+        if not self.headers.get('Connection'):
+             self.headers['Connection'] = 'close'
+
+        # Thêm các header từ self.headers
+        for key, value in self.headers.items():
+            header_lines.append(f"{key}: {value}")
+
+        # ✅ FIX: Thêm Set-Cookie headers từ cookies_to_set (Task 1A)
+        for cookie_key, cookie_string in self.cookies_to_set.items():
+            header_lines.append(f"Set-Cookie: {cookie_string}")
         
-        # Chuyển đổi dictionary headers thành chuỗi định dạng HTTP
-        # FIX: Chuyển tất cả value thành str trước khi join
-        header_lines = [f"{key}: {value}" for key, value in headers.items()]
-        fmt_header = status_line + "\r\n".join(header_lines) + "\r\n\r\n"
-        
-        return fmt_header.encode('utf-8')
+        # Thêm Connection: close nếu chưa có (để đảm bảo đóng kết nối)
+
+        return (status_line + "\r\n".join(header_lines) + "\r\n\r\n").encode('utf-8')
 
 
     def build_notfound(self):
@@ -254,36 +258,35 @@ class Response():
 
         :rtype bytes: Encoded 404 response.
         """
-
+        content = b"<h1>404 Not Found</h1>"
+        
         return (
-                "HTTP/1.1 404 Not Found\r\n"
-                "Accept-Ranges: bytes\r\n"
-                "Content-Type: text/html\r\n"
-                "Content-Length: 13\r\n"
-                "Cache-Control: max-age=86000\r\n"
-                "Connection: close\r\n"
-                "\r\n"
-                "404 Not Found"
-            ).encode('utf-8')
+            "HTTP/1.1 404 Not Found\r\n"
+            "Content-Type: text/html\r\n"
+            f"Content-Length: {len(content)}\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+            ).encode('utf-8') + content
     
+    # ✅ FIX: Định nghĩa phương thức build_unauthorized (401) (Task 1B)
     def build_unauthorized(self):
         """
         Constructs a standard 401 Unauthorized HTTP response.
 
         :rtype bytes: Encoded 401 response.
         """
-        # Nội dung phản hồi 401 (16 bytes)
-        content = b"401 Unauthorized" 
+        self.status_code = 401
+        self.reason = "Unauthorized"
+        # Nội dung trang 401
+        content = b"<h1>401 Unauthorized</h1><p>Access denied. Please log in.</p>" 
         
         return (
             "HTTP/1.1 401 Unauthorized\r\n"
             "Content-Type: text/html\r\n"
-            # ✅ FIX: Content-Length phải là 16 bytes
-            "Content-Length: 16\r\n" 
+            f"Content-Length: {len(content)}\r\n"
             "Connection: close\r\n"
             "\r\n"
-            "401 Unauthorized"
-        ).encode("utf-8")
+        ).encode("utf-8") + content
 
 
     def build_response(self, request):
