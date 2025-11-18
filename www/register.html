@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+<head>
+    <title>Peer Registration - HCMUT Chat</title>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/static/css/chat.css" /> 
+    <style>
+        /* CSS nội bộ để căn giữa form */
+        body { 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            background-color: #f0f2f5; 
+            text-align: center; 
+        }
+        .register-box {
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .register-box input, .register-box button {
+            padding: 10px;
+            margin: 10px 0;
+            width: 100%;
+            box-sizing: border-box;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        .register-box button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="register-box">
+        <h2>Register Your Chat Peer</h2>
+        <p>You have successfully logged in. Now, define your Peer Identity.</p>
+        
+        <div id="registration-panel">
+            <input type="text" id="peer-username-input" placeholder="Enter Your Username" required>
+            <button id="register-button" onclick="registerAndInit()">Register and Connect</button>
+            <p id="registration-status" style="font-size: 0.9em; margin-top: 15px;"></p>
+        </div>
+    </div>
+
+    <script src="/static/js/chat_client.js"></script> 
+</body>
+</html>

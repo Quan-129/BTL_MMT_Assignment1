@@ -1,21 +1,58 @@
 <!doctype html>
 <html>
 <head>
-    <title>bksysnet@hcmut welcome</title>
-
+    <title>Hybrid P2P Chat - HCMUT</title>
     <meta charset="utf-8" />
-    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="/static/css/chat.css" /> 
 </head>
 
-<body>
-<div>
-    <h1>bksysnet@hcmut  Domain</h1>
-    <p>This domain is for use in illustrative examples in documents.
-    </p>
-  
-       <img src="images/welcome.png" alt="bksysnet at HCMUT" width="500" height="600">  
-</div>
+<body> 
+    
+    <div id="app-container">
+        
+        <div id="peer-sidebar">
+            <div class="sidebar-header">
+                <h3>Peers Online / Channels</h3>
+            </div>
+            
+            <ul id="peer-list" class="peer-list">
+            </ul>
+            
+            <div class="sidebar-section channel-control-area">
+                <h4 style="margin-top: 15px; margin-bottom: 5px;">Channel Management</h4>
+                <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+                    <input type="text" id="channel-name-input" placeholder="Tên kênh mới..." style="flex-grow: 1; padding: 5px;">
+                    <button id="create-channel-button" style="padding: 5px 10px;">CREATE</button>
+                </div>
+            </div>
+
+            <div class="sidebar-section active-channels-list">
+                <h4 style="margin-bottom: 5px;">Active Channels</h4>
+                <ul id="channel-list" style="list-style: none; padding: 0;">
+                </ul>
+            </div>
+            
+            <div class="sidebar-footer">
+                <button id="refresh-button">Refresh Peers/Channels</button>
+            </div>
+        </div>
+
+        <div id="chat-main">
+            <div class="chat-header">
+                <h3 id="current-chat-title">Please select a Peer or Channel</h3>
+            </div>
+            
+            <div id="message-window" class="message-window">
+            </div>
+            
+            <div id="input-area" class="input-area">
+                <input type="text" id="message-input" placeholder="Type a message..." onkeyup="if(event.key === 'Enter') sendMessage()">
+                <button onclick="sendMessage()" class="send-btn">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/chat_client.js"></script> 
 </body>
 </html>

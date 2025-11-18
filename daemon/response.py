@@ -188,32 +188,35 @@ class Response():
 
         return base_dir
 
-
     def build_content(self, path, base_dir):
         """
         Loads the objects file from storage space.
-
-        :params path (str): relative path to the file.
-        :params base_dir (str): base directory where the file is located.
-
-        :rtype tuple: (int, bytes) representing content length and content data.
+        (Đã sửa để xử lý đường dẫn file tĩnh /static/ chính xác)
         """
+        
+        # 1. Xử lý đường dẫn file tĩnh (loại bỏ /static/ hoặc /www/)
+        # Nếu base_dir là 'static/', ta cần loại bỏ /static/ khỏi path
+        if path.startswith('/static/'):
+            filepath = path[8:] # Bỏ đi 8 ký tự đầu tiên '/static/'
+        elif path.startswith('/www/'): # Trường hợp path có tiền tố /www/
+            filepath = path[5:] # Bỏ đi 5 ký tự đầu tiên '/www/'
+        else:
+            filepath = path.lstrip('/')
 
-        filepath = os.path.join(base_dir, path.lstrip('/'))
+        full_path = os.path.join(base_dir, filepath)
 
-        print(("[Response] serving the object at location {}".format(filepath)))
+        print(("[Response] serving the object at location {}".format(full_path)))
         
         try:
-            # Mở file ở chế độ đọc nhị phân ('rb') để xử lý được cả text và ảnh
-            with open(filepath, 'rb') as f:
+            # Mở file ở chế độ đọc nhị phân ('rb')
+            with open(full_path, 'rb') as f:
                 content = f.read()
         except FileNotFoundError:
-            print(f"[Error] File not found: {filepath}")
+            print(f"[Error] File not found: {full_path}")
             # Trả về nội dung lỗi để build_response biết mà gọi build_notfound
             return 0, b"404 Not Found"
             
         return len(content), content
-
 
     def build_response_header(self, request):
         """

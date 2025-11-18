@@ -1,0 +1,248 @@
+/* static/css/chat.css (Tổng hợp Style Login và Chat - Đã chỉnh sửa UI/UX) */
+
+:root {
+    --primary-color: #007bff; /* Màu nhấn: Xanh dương */
+    --secondary-color: #f0f2f5; /* Nền nhẹ: Trắng xám */
+    --sidebar-bg: #ffffff;
+    --chat-bg: #e5ddd5; /* Nền chat cổ điển */
+    --sent-bubble: #dcf8c6; /* Xanh lá nhạt cho tin gửi */
+    --received-bubble: #ffffff; /* Trắng cho tin nhận */
+    --border-radius: 12px;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    /* Áp dụng nền cho toàn bộ ứng dụng */
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    color: #333;
+    overflow: hidden;
+}
+
+/* ============================================== */
+/* A. STYLE CHO TRANG LOGIN (www/login.html) */
+/* ============================================== */
+
+.login-page {
+    /* Đảm bảo Login form luôn căn giữa nếu chỉ nó hiển thị */
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+    width: 100%;
+}
+
+.login-container {
+    background-color: rgba(255, 255, 255, 0.95);
+    padding: 40px;
+    border-radius: 15px; /* Bo góc nổi bật */
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4); 
+    width: 100%;
+    max-width: 350px; 
+    text-align: center;
+}
+
+.login-title {
+    color: #333;
+    margin-bottom: 30px;
+    font-size: 1.8em;
+    font-weight: 700;
+}
+
+.form-group {
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+input[type="text"],
+input[type="password"] {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px; /* Bo góc input */
+    font-size: 1em;
+    box-sizing: border-box;
+}
+
+.login-btn {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.1em;
+    font-weight: bold;
+    width: 100%;
+    margin-top: 15px;
+    transition: background-color 0.3s ease;
+}
+
+.login-btn:hover {
+    background-color: #0056b3;
+}
+
+
+/* ============================================== */
+/* B. STYLE CHO TRANG CHAT (www/index.html) */
+/* ============================================== */
+
+#app-container {
+    /* Điều chỉnh lại display cho app-container để nó nổi lên trên nền body */
+    display: flex;
+    width: 90vw; 
+    max-width: 1200px;
+    height: 90vh; 
+    margin: 5vh auto;
+    border-radius: var(--border-radius);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    background-color: var(--sidebar-bg);
+}
+
+#peer-sidebar {
+    width: 300px;
+    min-width: 250px;
+    background-color: var(--sidebar-bg);
+    border-right: 1px solid #ddd;
+    display: flex;
+    flex-direction: column;
+    /* THÊM: Padding tổng thể cho nội dung sidebar không dính mép */
+    padding: 15px; 
+    box-sizing: border-box; 
+}
+
+/* 1. KHOẢNG CÁCH TIÊU ĐỀ SIDEBAR */
+#peer-sidebar .sidebar-header h3 {
+    margin-top: 0;
+    padding: 0;
+    margin-bottom: 10px; /* Thêm khoảng cách dưới tiêu đề */
+}
+
+/* 2. KHOẢNG CÁCH TIÊU ĐỀ CHAT CHÍNH ('Welcome, alice!') */
+#chat-main .chat-header {
+    background-color: white; /* Nền trắng cho tiêu đề chat */
+    padding: 15px 20px;
+    border-bottom: 1px solid #ddd;
+    margin-top: 0; 
+}
+
+#chat-main .chat-header h3 {
+    margin: 0; /* Xóa margin mặc định để Welcome Alice không bị dính */
+    font-size: 1.2em;
+    font-weight: 600;
+}
+
+/* 3. CĂN CHỈNH VÀ GOM NHÓM KÊNH */
+
+/* Điều chỉnh khu vực Control */
+.channel-control-area {
+    margin-bottom: 15px; /* Khoảng cách giữa Control và Active Channels */
+    padding-bottom: 15px;
+    border-bottom: 1px solid #eee;
+}
+.channel-control-area h4 {
+    margin-top: 0;
+}
+
+/* Áp dụng kiểu dáng cho từng mục trong danh sách peers/channels */
+.peer-list li,
+#channel-list li {
+    padding: 8px 0; /* Giảm padding dọc để gọn gàng hơn */
+    border-bottom: 1px solid #f0f0f0; 
+    cursor: pointer; 
+    transition: background-color 0.2s; 
+    font-weight: 500;
+}
+
+/* QUY TẮC CẦN THIẾT: CĂN CHỈNH NÚT CHAT/THÀNH VIÊN */
+#channel-list li {
+    display: flex; 
+    align-items: center;
+    justify-content: space-between; /* Giãn các phần tử ra hai bên */
+    padding-right: 5px; 
+    line-height: 1.2;
+}
+
+#channel-list .member-count {
+    /* Đảm bảo số thành viên nằm sát nút CHAT/JOIN */
+    margin-left: 5px; 
+    color: #666;
+    font-size: 0.9em;
+    flex-shrink: 0;
+}
+
+#channel-list button {
+    /* Đẩy nút sang tận cùng bên phải */
+    margin-left: auto; 
+    flex-shrink: 0;
+    padding: 3px 8px;
+    font-size: 0.8em;
+}
+
+
+/* 4. CHÂN SIDEBAR (REFRESH BUTTON) */
+.sidebar-footer {
+    margin-top: auto; /* Đẩy xuống dưới cùng */
+    padding-top: 15px;
+    border-top: 1px solid #ddd;
+    text-align: center;
+}
+
+.sidebar-footer button {
+    width: 100%;
+    padding: 8px;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+
+/* Phần còn lại của Chat Style (giữ nguyên) */
+.peer-list {
+    list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1;
+}
+.peer-list li:hover {
+    background-color: #e9eef2;
+}
+
+#chat-main {
+    flex-grow: 1; background-color: var(--secondary-color); display: flex; flex-direction: column;
+}
+
+.message-window {
+    flex-grow: 1; padding: 20px; overflow-y: auto; background-color: var(--secondary-color);
+}
+
+.message-bubble {
+    padding: 10px 14px; margin: 8px 0; max-width: 65%; border-radius: var(--border-radius); line-height: 1.4; word-wrap: break-word; display: flex; align-items: center;
+}
+
+.sent {
+    background-color: var(--sent-bubble); margin-left: auto; border-bottom-right-radius: 3px;
+}
+
+.received {
+    background-color: var(--received-bubble); margin-right: auto; border: 1px solid #eee; border-bottom-left-radius: 3px;
+}
+
+.input-area {
+    display: flex; padding: 15px 20px; background-color: var(--sidebar-bg); border-top: 1px solid #ddd;
+}
+
+#message-input {
+    flex-grow: 1; padding: 12px 15px; border: 1px solid #ccc; border-radius: 20px; margin-right: 15px; font-size: 1em;
+}
+
+.send-btn {
+    background-color: var(--primary-color); color: white; padding: 12px 20px; border: none; border-radius: 20px; cursor: pointer; font-weight: bold; transition: background-color 0.3s;
+}
+
+.send-btn:hover {
+    background-color: #0056b3;
+}
