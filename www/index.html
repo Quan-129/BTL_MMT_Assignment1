@@ -22,8 +22,8 @@
             <div class="sidebar-section channel-control-area">
                 <h4 style="margin-top: 15px; margin-bottom: 5px;">Channel Management</h4>
                 <div style="display: flex; gap: 5px; margin-bottom: 10px;">
-                    <input type="text" id="channel-name-input" placeholder="Tên kênh mới..." style="flex-grow: 1; padding: 5px;">
-                    <button id="create-channel-button" style="padding: 5px 10px;">CREATE</button>
+                    <input type="text" id="channel-name-input" placeholder="Tên kênh mới...">
+                    <button id="create-channel-button">CREATE</button>
                 </div>
             </div>
 
@@ -31,6 +31,19 @@
                 <h4 style="margin-bottom: 5px;">Active Channels</h4>
                 <ul id="channel-list" style="list-style: none; padding: 0;">
                 </ul>
+            </div>
+            
+            <div class="sidebar-section notification-area" style="margin-top: 15px;">
+                <h4 style="margin-bottom: 5px;">Notifications</h4>
+                <div id="notification-window" style="
+                    height: 100px; 
+                    overflow-y: auto; 
+                    background: #f9f9f9; 
+                    padding: 5px; 
+                    border: 1px solid #ddd; 
+                    font-size: 0.8em;
+                    line-height: 1.2;">
+                    </div>
             </div>
             
             <div class="sidebar-footer">
