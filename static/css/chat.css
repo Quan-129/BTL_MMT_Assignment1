@@ -1,4 +1,4 @@
-/* static/css/chat.css (Phiên bản Hoàn thiện UI/UX và đồng bộ) */
+/* static/css/chat.css (Phiên bản Cuối cùng: KHẮC PHỤC HOÀN TOÀN CĂN CHỈNH KÊNH & INPUT) */
 
 :root {
     --primary-color: #007bff;
@@ -8,6 +8,7 @@
     --sent-bubble: #dcf8c6;
     --received-bubble: #ffffff;
     --border-radius: 12px;
+    --font-size-base: 1.2em; 
 }
 
 body {
@@ -17,13 +18,13 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    min-height: 100vh;
+    min-height: 100vh; 
     color: #333;
-    overflow: hidden;
+    font-size: var(--font-size-base); 
 }
 
 /* ============================================== */
-/* A. STYLE CHO TRANG LOGIN (www/login.html) - Giữ nguyên */
+/* A. STYLE CHO TRANG LOGIN/REGISTER - Giữ nguyên */
 /* ============================================== */
 
 .login-page {
@@ -35,47 +36,47 @@ body {
 
 .login-container {
     background-color: rgba(255, 255, 255, 0.95);
-    padding: 40px;
+    padding: 50px;
     border-radius: 15px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4); 
     width: 100%;
-    max-width: 350px; 
-    text-align: center;
+    max-width: 450px;
+    text-align: left;
 }
 
 .login-title {
     color: #333;
     margin-bottom: 30px;
-    font-size: 1.8em;
+    font-size: 2.2em;
     font-weight: 700;
+    text-align: center; 
 }
 
 .form-group {
     margin-bottom: 20px;
-    text-align: left;
 }
 
 input[type="text"],
 input[type="password"] {
     width: 100%;
-    padding: 12px;
+    padding: 16px;
     border: 1px solid #ddd;
     border-radius: 8px;
-    font-size: 1em;
+    font-size: 1.2em;
     box-sizing: border-box;
 }
 
 .login-btn {
     background-color: var(--primary-color);
     color: white;
-    padding: 12px 20px;
+    padding: 16px 20px;
     border: none;
     border-radius: 8px;
     cursor: pointer;
-    font-size: 1.1em;
+    font-size: 1.3em;
     font-weight: bold;
     width: 100%;
-    margin-top: 15px;
+    margin-top: 20px;
     transition: background-color 0.3s ease;
 }
 
@@ -90,10 +91,10 @@ input[type="password"] {
 
 #app-container {
     display: flex;
-    width: 90vw; 
-    max-width: 1200px;
-    height: 90vh; 
-    margin: 5vh auto;
+    width: 95vw; 
+    max-width: 1600px;
+    height: 95vh; 
+    margin: 2.5vh auto; 
     border-radius: var(--border-radius);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
     overflow: hidden;
@@ -101,13 +102,13 @@ input[type="password"] {
 }
 
 #peer-sidebar {
-    width: 300px;
-    min-width: 250px;
+    width: 350px;
+    min-width: 300px; 
     background-color: var(--sidebar-bg);
     border-right: 1px solid #ddd;
     display: flex;
     flex-direction: column;
-    padding: 15px; 
+    padding: 20px;
     box-sizing: border-box; 
 }
 
@@ -115,104 +116,128 @@ input[type="password"] {
 #peer-sidebar .sidebar-header h3 {
     margin-top: 0;
     padding: 0;
-    margin-bottom: 10px;
+    margin-bottom: 15px;
+    font-size: 1.3em;
 }
 
-/* 2. KHOẢNG CÁCH TIÊU ĐỀ CHAT CHÍNH */
+/* 2. KHU VỰC CHAT CHÍNH (QUAN TRỌNG: CẦN FLEX COLUMN ĐỂ CHIA HEADER, WINDOW, INPUT) */
+#chat-main {
+    flex-grow: 1; 
+    background-color: var(--secondary-color); 
+    display: flex; 
+    flex-direction: column;
+}
+
 #chat-main .chat-header {
     background-color: white;
-    padding: 15px 20px;
+    padding: 20px 25px;
     border-bottom: 1px solid #ddd;
     margin-top: 0; 
+    flex-shrink: 0;
 }
 
 #chat-main .chat-header h3 {
     margin: 0;
-    font-size: 1.2em;
+    font-size: 1.5em;
     font-weight: 600;
+}
+
+/* KHÔI PHỤC: CỬA SỔ TIN NHẮN PHẢI CHIẾM HẾT PHẦN CÒN LẠI */
+.message-window {
+    flex-grow: 1; 
+    padding: 25px;
+    overflow-y: auto; 
+    background-color: var(--secondary-color);
 }
 
 /* 3. ĐỊNH DẠNG KHU VỰC CHANNEL */
 
 .channel-control-area {
-    margin-bottom: 15px; 
-    padding-bottom: 15px;
+    margin-bottom: 20px; 
+    padding-bottom: 20px;
     border-bottom: 1px solid #eee;
 }
 .channel-control-area h4 {
     margin-top: 0;
+    font-size: 1em;
 }
 
-/* FIX: Khôi phục kích thước input/button trong Channel Management */
 .channel-control-area input[type="text"] {
-    /* Đảm bảo input giãn ra hết cỡ */
     flex-grow: 1; 
-    padding: 5px 8px;
-    height: 30px; /* Chiều cao cố định */
+    padding: 8px 12px;
+    height: 38px;
     box-sizing: border-box;
     border-radius: 5px;
+    font-size: 1em;
 }
 .channel-control-area button {
-    /* Đảm bảo nút có chiều rộng cố định */
     flex-shrink: 0;
-    width: 60px;
-    height: 30px;
-    font-size: 0.9em;
+    width: 80px;
+    height: 38px;
+    font-size: 1em;
     border-radius: 5px;
     padding: 0;
 }
 
+/* KHẮC PHỤC LỖI CĂN CHỈNH KÊNH */
 
-/* Áp dụng kiểu dáng cho từng mục trong danh sách peers/channels */
-.peer-list li,
-#channel-list li {
-    padding: 8px 0; 
-    border-bottom: 1px solid #f0f0f0; 
-    cursor: pointer; 
-    transition: background-color 0.2s; 
-    font-weight: 500;
-}
-
-/* CĂN CHỈNH KÊNH */
 #channel-list li {
     display: flex; 
     align-items: center;
-    justify-content: space-between;
-    padding-right: 5px; 
-    line-height: 1.2;
+    justify-content: space-between; 
+    padding: 8px 5px; 
+    border-bottom: 1px solid #f0f0f0; 
+    cursor: pointer; 
+    font-weight: 500;
+}
+
+#channel-list .channel-name {
+    /* KHẮC PHỤC: Đảm bảo tên kênh có thể co giãn và không bị ẩn */
+    flex-grow: 1;
+    min-width: 0; 
+    margin-right: 5px;
+    /* BỔ SUNG: Ngăn tiêu đề quá dài làm tràn container */
+    overflow: hidden; 
+    text-overflow: ellipsis;
+    white-space: nowrap; 
 }
 
 #channel-list .member-count {
-    margin-left: 5px; 
+    /* KHẮC PHỤC LỖI CỐT LÕI: Ngăn văn bản ngắt dòng và chiếm ít không gian */
+    flex-shrink: 0; 
+    white-space: nowrap; /* NGĂN CHỮ "thành viên" BỊ XUỐNG DÒNG */
+    margin-right: 10px; 
     color: #666;
     font-size: 0.9em;
-    flex-shrink: 0;
 }
 
 #channel-list button {
-    margin-left: auto; 
     flex-shrink: 0;
+    width: auto;
+    min-width: 50px; 
     padding: 3px 8px;
     font-size: 0.8em;
+    margin-left: 5px; 
 }
 
-/* 4. KHU VỰC THÔNG BÁO MỚI (NOTIFICATIONS) */
+
+/* 4. KHU VỰC THÔNG BÁO */
 .notification-area {
-    margin-top: 15px;
-    margin-bottom: 15px;
-    padding-bottom: 15px;
+    margin-top: 20px;
+    margin-bottom: 20px;
+    padding-bottom: 20px;
     border-bottom: 1px solid #eee;
     flex-shrink: 0; 
 }
 
 #notification-window {
-    height: 100px; 
+    height: 150px;
     overflow-y: auto; 
     background: #f9f9f9; 
-    padding: 5px; 
+    padding: 10px;
     border: 1px solid #ddd; 
-    font-size: 0.8em;
-    line-height: 1.2;
+    font-size: 0.9em; 
+    line-height: 1.4;
     border-radius: 5px;
 }
 
@@ -223,7 +248,42 @@ input[type="password"] {
     word-break: break-all;
 }
 
-/* 5. CHÂN SIDEBAR (REFRESH BUTTON) */
+/* 5. INPUT CHAT CUỐI CÙNG (SỬA LỖI NÚT SEND) */
+.input-area {
+    display: flex; 
+    padding: 20px 25px;
+    background-color: var(--sidebar-bg); 
+    border-top: 1px solid #ddd;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+#message-input {
+    flex-grow: 1; 
+    padding: 12px 18px; 
+    border: 1px solid #ccc; 
+    border-radius: 30px; 
+    margin-right: 10px;
+    font-size: 1.1em; 
+    height: 48px; 
+    box-sizing: border-box;
+    min-width: 100px;
+}
+
+.send-btn {
+    background-color: var(--primary-color); 
+    color: white; 
+    height: 48px; 
+    padding: 0 20px;
+    border: none; 
+    border-radius: 30px; 
+    cursor: pointer; 
+    font-weight: bold; 
+    font-size: 1.1em;
+    transition: background-color 0.3s;
+}
+
+/* 6. CHÂN SIDEBAR (REFRESH BUTTON) */
 .sidebar-footer {
     margin-top: auto; 
     padding-top: 15px;
@@ -233,7 +293,9 @@ input[type="password"] {
 
 .sidebar-footer button {
     width: 100%;
-    padding: 8px;
+    padding: 12px;
+    font-size: 1.1em; 
+    font-weight: bold;
     background-color: var(--primary-color);
     color: white;
     border: none;
@@ -241,47 +303,46 @@ input[type="password"] {
     cursor: pointer;
 }
 
-
-/* Phần còn lại của Chat Style (giữ nguyên) */
-.peer-list {
-    list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1;
-}
-.peer-list li:hover {
-    background-color: #e9eef2;
-}
-
-#chat-main {
-    flex-grow: 1; background-color: var(--secondary-color); display: flex; flex-direction: column;
-}
-
+/* ... (Các phần còn lại giữ nguyên) ... */
 .message-window {
-    flex-grow: 1; padding: 20px; overflow-y: auto; background-color: var(--secondary-color);
+    flex-grow: 1; padding: 25px;
+    overflow-y: auto; background-color: var(--secondary-color);
 }
 
 .message-bubble {
-    padding: 10px 14px; margin: 8px 0; max-width: 65%; border-radius: var(--border-radius); line-height: 1.4; word-wrap: break-word; display: flex; align-items: center;
+    padding: 12px 16px;
+    margin: 12px 0;
+    max-width: 60%;
+    border-radius: var(--border-radius);
+    line-height: 1.4;
+    word-wrap: break-word;
+    display: block;
 }
 
-.sent {
-    background-color: var(--sent-bubble); margin-left: auto; border-bottom-right-radius: 3px;
+/* Messenger-like alignment and colors */
+.message-bubble.sent {
+    background: #0084ff; /* Messenger blue */
+    color: white;
+    margin-left: auto; /* align right */
+    border-bottom-right-radius: 6px;
+    border-bottom-left-radius: 12px;
 }
 
-.received {
-    background-color: var(--received-bubble); margin-right: auto; border: 1px solid #eee; border-bottom-left-radius: 3px;
+.message-bubble.received {
+    background: #e6e6e6; /* slightly darker gray */
+    color: #111;
+    margin-right: auto; /* align left */
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 12px;
 }
 
-.input-area {
-    display: flex; padding: 15px 20px; background-color: var(--sidebar-bg); border-top: 1px solid #ddd;
+.message-bubble strong {
+    display: inline-block;
+    font-weight: 700;
+    margin-right: 8px;
 }
 
-#message-input {
-    flex-grow: 1; padding: 12px 15px; border: 1px solid #ccc; border-radius: 20px; margin-right: 15px; font-size: 1em;
-}
-
-.send-btn {
-    background-color: var(--primary-color); color: white; padding: 12px 20px; border: none; border-radius: 20px; cursor: pointer; font-weight: bold; transition: background-color 0.3s;
-}
-
-.send-btn:hover {
-    background-color: #0056b3;
+/* Slightly increase max-width on large screens for better reading */
+@media (min-width: 1000px) {
+    .message-bubble { max-width: 55%; }
 }
