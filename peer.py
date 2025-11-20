@@ -1,5 +1,3 @@
-# peer.py (PHIÊN BẢN HOÀN CHỈNH VỚI LOGIC CHANNEL QUA SOCKET)
-
 import socket
 import json
 import threading
@@ -8,12 +6,21 @@ import os
 import sys
 
 # --- CẤU HÌNH VÀ GLOBAL STATE ---
-TRACKER_IP = '127.0.0.1' 
+# SỬA: Dùng IP LAN thực tế cho Tracker
+TRACKER_IP = '192.168.1.152' 
 TRACKER_PORT = 9999 
 
 PEER_MAP = {}
 PEER_MESSAGES_BUFFER = [] # Buffer tin nhắn P2P nhận được, phục vụ Polling
-MY_IP = '127.0.0.1' 
+
+# BIẾN ĐỊA CHỈ IP LAN: Địa chỉ thực của máy tính để peer khác kết nối tới
+MY_IP_LAN = '192.168.1.152' 
+
+# BIẾN ĐỊA CHỈ BIND: Địa chỉ để server lắng nghe (0.0.0.0 nghe tất cả)
+MY_IP_BIND = '0.0.0.0'
+# MY_IP_BIND = '127.0.0.1' # <-- ĐÃ CMT LẠI: Địa chỉ chỉ dùng cho test nội bộ
+
+MY_IP = MY_IP_BIND # Mặc định dùng IP lắng nghe cho các hàm bind
 MY_PORT = 8000 # [Lưu ý] Port HTTP/WebApp. Port P2P là MY_PORT + 1.
 
 # --- HÀM TRỢ GIÚP CHUNG ---
@@ -65,7 +72,7 @@ def call_tracker_api(path, method='GET', data=None):
         "Connection: close",
         "",
         body
-]
+    ]
     request = "\r\n".join(request_lines)
 
     try:
@@ -90,13 +97,17 @@ def call_tracker_api(path, method='GET', data=None):
 # --- LOGIC CLIENT (Giao tiếp với Tracker) ---
 
 def register_with_tracker(username, ip, http_port):
-    """Gửi thông tin đăng ký đến máy chủ Tracker, sử dụng port P2P."""
+    """
+    Gửi thông tin đăng ký đến máy chủ Tracker, sử dụng port P2P.
+    SỬA: Luôn gửi MY_IP_LAN (địa chỉ thực) lên Tracker.
+    """
+    global MY_IP_LAN
     
     p2p_listen_port = _get_p2p_port(http_port) 
     
     data = {
         "peer_id": username,
-        "ip": ip,
+        "ip": MY_IP_LAN, # Gửi IP LAN thực tế để peer khác kết nối tới
         "port": p2p_listen_port
     }
     
@@ -129,7 +140,7 @@ def _make_p2p_request(ip, port, message):
     """Hàm lõi gửi tin nhắn TCP P2P."""
     
     # Định dạng tin nhắn P2P: [MY_USERNAME] message content
-    full_message = f"[{MY_IP}:{MY_PORT}] {message}" 
+    full_message = f"[{MY_IP_LAN}:{MY_PORT}] {message}" # Sử dụng IP LAN khi gửi
 
     p2p_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
@@ -167,7 +178,7 @@ def send_message_to_peer(peer_id_full, message, peer_list):
 
 def broadcast_message(message):
     """Gửi một tin nhắn đến tất cả các peer trong danh sách, trừ chính mình."""
-    global PEER_MAP
+    global PEER_MAP, MY_IP_LAN
     
     get_peer_list() # Cập nhật danh sách mới nhất
     latest_peer_list = PEER_MAP
@@ -235,7 +246,8 @@ def peer_server_thread(ip, port):
     """Luồng chạy server để lắng nghe kết nối P2P từ các peer khác."""
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
-        server.bind((ip, port)) # Lắng nghe trên Port P2P riêng biệt
+        # LƯU Ý: ip ở đây phải là 0.0.0.0 hoặc IP LAN để nghe từ mạng ngoài
+        server.bind((ip, port)) 
     except OSError as e:
         print(f"[P2P Server ERROR] KHÔNG THỂ BIND VÀO PORT {port}: {e}")
         return 
@@ -256,6 +268,7 @@ def init_peer_server(ip, http_port):
     
     p2p_listen_port = _get_p2p_port(http_port)
     
+    # Đảm bảo server lắng nghe trên IP chính xác mà start_sampleapp.py cung cấp (0.0.0.0)
     MY_IP = ip
     MY_PORT = http_port
     

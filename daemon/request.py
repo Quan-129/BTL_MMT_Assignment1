@@ -56,7 +56,7 @@ class Request():
         #: dictionary of HTTP headers.
         self.headers = None
         #: HTTP path
-        self.path = None        
+        self.path = None 
         # The cookies set used to create Cookie header
         self.cookies = None
         #: request body to send to the server.
@@ -78,15 +78,16 @@ class Request():
             return None, None
 
         return method, path, version
-             
+            
     def prepare_headers(self, request):
         """Prepares the given HTTP headers."""
         lines = request.split('\r\n')
         headers = {}
         for line in lines[1:]:
             if ': ' in line:
+                # Sửa: split(': ', 1) để đảm bảo key không bị thừa khoảng trắng
                 key, val = line.split(': ', 1)
-                headers[key.lower()] = val
+                headers[key.lower()] = val.strip() # Sửa: Strip giá trị để làm sạch
         return headers
 
     def prepare(self, request, routes=None):
@@ -96,40 +97,34 @@ class Request():
         self.method, self.path, self.version = self.extract_request_line(request)
         print(("[Request] {} path {} version {}".format(self.method, self.path, self.version)))
 
-        #
-        # @bksysnet Preapring the webapp hook with WeApRous instance
-        # The default behaviour with HTTP server is empty routed
-        #
-        # TODO manage the webapp hook in this mounting point
-        #
-        
+        # Routing logic (giữ nguyên)
         if not routes == {}:
             self.routes = routes
             self.hook = routes.get((self.method, self.path))
-            #
-            # self.hook manipulation goes here
-            # ...
-            #
 
         self.headers = self.prepare_headers(request)
-        # cookies = self.headers.get('cookie', '')
-            #
-            #  TODO: implement the cookie function here
-            #        by parsing the header            #
-        # --- BẮT ĐẦU PHẦN SỬA ---
-        # Khởi tạo self.cookies là một dictionary rỗng
+        
+        # --- BẮT ĐẦU PHẦN SỬA LỖI PARSING COOKIE TRONG REQUEST.PY ---
         self.cookies = {}
-        # Lấy chuỗi cookie từ header
         cookie_string = self.headers.get('cookie', '')
 
         # Phân tích chuỗi cookie nếu nó tồn tại
         if cookie_string:
-            # Tách các cặp key=value bằng dấu '; '
+            # Tách các cặp key=value bằng dấu '; ' hoặc ';'
             pairs = cookie_string.split('; ')
+            if len(pairs) == 1:
+                 pairs = cookie_string.split(';')
+
             for pair in pairs:
-                # Tách key và value bằng dấu '='
+                # Tách key và value, giới hạn 1 lần tách
                 if '=' in pair:
                     key, value = pair.split('=', 1)
+                    
+                    # LƯU Ý QUAN TRỌNG: Làm sạch key và value
+                    key = key.strip()
+                    value = value.strip()
+                    
+                    # Lưu key và value đã được làm sạch
                     self.cookies[key] = value
         
         print(f"[Request] Cookies found: {self.cookies}")
@@ -137,30 +132,19 @@ class Request():
 
         return
 
+    # ... (Các hàm khác giữ nguyên)
     def prepare_body(self, data, files, json=None):
         self.prepare_content_length(self.body)
         self.body = body
-        #
-        # TODO prepare the request authentication
-        #
-	# self.auth = ...
         return
 
 
     def prepare_content_length(self, body):
         self.headers["Content-Length"] = "0"
-        #
-        # TODO prepare the request authentication
-        #
-	# self.auth = ...
         return
 
 
     def prepare_auth(self, auth, url=""):
-        #
-        # TODO prepare the request authentication
-        #
-	# self.auth = ...
         return
 
     def prepare_cookies(self, cookies):

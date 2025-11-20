@@ -108,7 +108,8 @@ def build_welcome_response(set_cookie=None):
             padding: 50px 20px 20px;
         }
         .logo-img {
-            width: 400px;
+            width: 700px;        /* Kích thước mong muốn (thay 700px bằng giá trị bạn muốn) */
+            max-width: 90vw;     /* Đảm bảo ảnh co lại trên màn hình nhỏ */
             height: auto;
             margin-bottom: 30px;
         }
@@ -170,9 +171,14 @@ def serve_login_page(headers="guest", body="anonymous"):
 
 @app.route('/login', methods=['POST'])
 def login(headers="guest", body="anonymous"):
+    print(f"[LOGIN] Received POST /login with body: {body}")
     if "username=admin" in body and "password=password" in body:
-        return build_welcome_response(set_cookie="auth=true; Path=/")
+        print(f"[LOGIN] Credentials valid. Returning response with Set-Cookie: auth=true")
+        response, status = build_welcome_response(set_cookie="auth=true; Path=/")
+        print(f"[LOGIN] First 500 chars of response: {response[:500]}")
+        return response, status
     else:
+        print(f"[LOGIN] Invalid credentials. Returning 401.")
         return build_401_response()
 
 
@@ -205,13 +211,16 @@ def register_route(headers="guest", body="anonymous"):
         # Giả định peer.register_with_tracker đã được cập nhật để gửi cả username lên Tracker
         if peer.register_with_tracker(username, peer.MY_IP, peer.MY_PORT):
             p2p_port = peer._get_p2p_port(peer.MY_PORT)
+            
+            # CHỈ TRẢ VỀ JSON RESPONSE CHUẨN (KHÔNG SET-COOKIE LẠI)
+            # Cookie 'auth=true' đã được đặt khi POST /login thành công.
             return build_json_response(200, {"status": "success", "peer_id": f"{username}@{peer.MY_IP}:{p2p_port}"})
+            
         else:
             return build_json_response(503, {"status": "error", "message": "Failed to register with Tracker"})
         
     except Exception as e:
         return build_json_response(500, {"status": "error", "message": str(e)})
-
 
 @app.route('/get-list', methods=['GET'])
 def get_list_route(headers="guest", body="anonymous"):

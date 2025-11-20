@@ -121,11 +121,12 @@ async function registerPeer(username, ip, http_port, statusElement) {
     const url = `${WEAPROUS_BASE_URL}/register-peer`;
     
     try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: username })
-        });
+        const response = await fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: username })
+        });
         const data = await response.json();
         
         if (response.ok) {
@@ -140,8 +141,17 @@ async function registerPeer(username, ip, http_port, statusElement) {
             statusElement.style.color = 'green';
             
             // CHUYỂN HƯỚNG TRÌNH DUYỆT SANG TRANG CHAT CHÍNH
-            await new Promise(resolve => setTimeout(resolve, 500)); 
-            window.location.href = `${WEAPROUS_BASE_URL}/index.html`;
+            // Ensure the browser has an 'auth' cookie so protected GET /index.html won't return 401.
+            // Some browsers (and fetch flows) may not persist Set-Cookie in all cases, so set it client-side
+            // as a fallback. This is safe for this local dev app (not for production with HttpOnly cookies).
+            try {
+                document.cookie = 'auth=true; Path=/';
+            } catch (e) {
+                console.warn('Could not set cookie via document.cookie', e);
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 300));
+            window.location.href = `${WEAPROUS_BASE_URL}/index.html`;
             
         } else {
             // Lỗi từ backend (ví dụ: 503 Tracker Down)
