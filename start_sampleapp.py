@@ -310,8 +310,9 @@ def send_peer_route(headers="guest", body="anonymous"):
         message = data.get('message')
         
         if target_type == 'peer':
-            # 1. Gửi trực tiếp P2P (giữ nguyên logic cũ)
-            peer.send_message_to_peer(target_id, message, peer.PEER_MAP)
+            # 1. Gửi trực tiếp P2P; pass through sender_username so receiver sees correct sender
+            sender_username = data.get('sender_username') or 'unknown'
+            peer.send_message_to_peer(target_id, message, peer.PEER_MAP, sender_username)
             return build_json_response(200, {"status": "success", "mode": "direct_peer"})
 
         elif target_type == 'channel':
@@ -330,8 +331,9 @@ def send_peer_route(headers="guest", body="anonymous"):
 
             member_list = tracker_response['data'].get('members', [])
             
-            # Gửi tin P2P đến từng thành viên (hàm này cần được code trong peer.py)
-            success_count, fail_count = peer.send_message_to_channel_members(member_list, message)
+            # Gửi tin P2P đến từng thành viên (hàm này đã chờ sender_username)
+            sender_username = data.get('sender_username') or 'unknown'
+            success_count, fail_count = peer.send_message_to_channel_members(member_list, message, sender_username)
             
             return build_json_response(200, {
                 "status": "success", 

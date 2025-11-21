@@ -7,18 +7,18 @@ import sys
 
 # --- CẤU HÌNH VÀ GLOBAL STATE ---
 # SỬA: Dùng IP LAN thực tế cho Tracker
-TRACKER_IP = '192.168.1.152' 
+TRACKER_IP = '127.0.0.1'
 TRACKER_PORT = 9999 
 
 PEER_MAP = {}
 PEER_MESSAGES_BUFFER = [] # Buffer tin nhắn P2P nhận được, phục vụ Polling
 
 # BIẾN ĐỊA CHỈ IP LAN: Địa chỉ thực của máy tính để peer khác kết nối tới
-MY_IP_LAN = '192.168.1.152' 
+MY_IP_LAN = '127.0.0.1'
 
 # BIẾN ĐỊA CHỈ BIND: Địa chỉ để server lắng nghe (0.0.0.0 nghe tất cả)
-MY_IP_BIND = '0.0.0.0'
-# MY_IP_BIND = '127.0.0.1' # <-- ĐÃ CMT LẠI: Địa chỉ chỉ dùng cho test nội bộ
+MY_IP_BIND = '127.0.0.1'
+# MY_IP_BIND = '0.0.0.0' # <-- ĐÃ CMT LẠI: Địa chỉ chỉ dùng cho test nội bộ
 
 MY_IP = MY_IP_BIND # Mặc định dùng IP lắng nghe cho các hàm bind
 MY_PORT = 8000 # [Lưu ý] Port HTTP/WebApp. Port P2P là MY_PORT + 1.
@@ -155,20 +155,25 @@ def _make_p2p_request(ip, port, message):
         print(f"[ERROR P2P] Error sending message to {ip}:{port}: {e}")
         raise ConnectionError(f"Error sending to {ip}:{port}: {e}")
 
-def send_message_to_peer(peer_id_full, message, peer_list):
-    """Kết nối và gửi tin nhắn đến một peer cụ thể (P2P)."""
-    
+def send_message_to_peer(peer_id_full, message, peer_list, sender_username=None):
+    """Kết nối và gửi tin nhắn đến một peer cụ thể (P2P).
+
+    If sender_username is provided, use it as the bracketed sender. Otherwise
+    fall back to using the peer_id_full's username (not recommended).
+    """
+
     target_peer_info = peer_list.get(peer_id_full)
-    
+
     if not target_peer_info:
         raise ValueError(f"Peer ID '{peer_id_full}' not found or offline.")
 
     target_ip = target_peer_info['ip']
     target_port = int(target_peer_info['port'])
 
-    # Tiền tố tin nhắn với Port HTTP/WebApp của MÌNH (dùng cho tra cứu username)
-    full_message = f"[{peer_id_full.split('@')[0]}] {message}" # Gửi username trực tiếp
-    
+    # Use the actual sender username if provided; fallback to peer_id_full's username
+    sender = sender_username if sender_username else peer_id_full.split('@')[0]
+    full_message = f"[{sender}] {message}"
+
     try:
         _make_p2p_request(target_ip, target_port, full_message)
     except Exception as e:
@@ -195,7 +200,7 @@ def broadcast_message(message):
 
 # --- HÀM MỚI: GỬI TIN NHẮN ĐẾN THÀNH VIÊN KÊNH ---
 
-def send_message_to_channel_members(member_list, message):
+def send_message_to_channel_members(member_list, message, sender_username):
     """
     Gửi tin nhắn P2P đến tất cả các thành viên trong danh sách.
     member_list là list các dict: [{'ip': ip, 'port': p2p_port, 'username': user}]
@@ -209,8 +214,10 @@ def send_message_to_channel_members(member_list, message):
         # Tránh gửi đến chính mình
         if peer_data['port'] != my_p2p_port:
             try:
-                # Định dạng tin nhắn P2P: [USERNAME] message content
-                full_message = f"[{peer_data['username']}] {message}"
+                # Định dạng tin nhắn P2P: [SENDER_USERNAME] message content
+                # Use the sender's username (the one who originated the message),
+                # not the recipient's username.
+                full_message = f"[{sender_username}] {message}"
                 _make_p2p_request(peer_data['ip'], peer_data['port'], full_message)
                 success_count += 1
             except Exception:

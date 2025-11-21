@@ -10,6 +10,7 @@ const USERNAME_KEY = 'chat_username';
 
 let CURRENT_TARGET_ID = null; 
 let CURRENT_TARGET_TYPE = null; // 'peer' hoặc 'channel'
+let CURRENT_TARGET_INTERNAL_ID = null; // actual internal id used for sending (username@ip:p2p_port)
 let MY_PEER_ID = null;
 let MY_USERNAME = null;
 
@@ -173,12 +174,13 @@ async function registerPeer(username, ip, http_port, statusElement) {
     }
 }
 
-function setTarget(targetId, targetType) {
+function setTarget(targetId, targetType, internalId=null) {
     // Nếu chọn cùng một mục, không làm gì
-    if (CURRENT_TARGET_ID === targetId && CURRENT_TARGET_TYPE === targetType) return;
+    if (CURRENT_TARGET_ID === targetId && CURRENT_TARGET_TYPE === targetType) return;
 
-    CURRENT_TARGET_ID = targetId;
-    CURRENT_TARGET_TYPE = targetType;
+    CURRENT_TARGET_ID = targetId;
+    CURRENT_TARGET_TYPE = targetType;
+    CURRENT_TARGET_INTERNAL_ID = internalId; // may be null for channels/broadcast
     const titleElement = document.getElementById('current-chat-title');
     const messageWindow = document.getElementById('message-window'); 
 
@@ -215,20 +217,25 @@ async function loadPeersAndChannels() {
         if (peerResponse.ok) {
             peerFetchSuccess = true;
             peerData.peers.forEach(peer => {
-                const peerIdFull = `${peer.username}@${peer.ip}:${peer.port}`;
-                
-                // LƯU TRỮ CHO TRA CỨU: IP:HTTP_PORT -> USERNAME
-                const peerHttpPort = parseInt(peer.port) - 1; 
-                const incomingIpPort = `${peer.ip}:${peerHttpPort}`; 
-                PEER_USERNAME_MAP[incomingIpPort] = peer.username;
-                
-                if (peerIdFull !== MY_PEER_ID) { 
-                    const li = document.createElement('li');
-                    li.textContent = peerIdFull;
-                    // Khi click vào peer, type là 'peer'
-                    li.onclick = () => setTarget(peerIdFull, 'peer'); 
-                    peerListElement.appendChild(li);
-                }
+                // Skip showing ourselves in the peer list. Compare by username
+                // because MY_PEER_ID may use a different host representation (0.0.0.0 vs LAN IP).
+                if (peer.username !== MY_USERNAME) {
+                        // Display the peer using the HTTP/WEB port (p2p_port - 1)
+                        const peerP2pPort = parseInt(peer.port);
+                        const peerHttpPort = peerP2pPort - 1;
+                        const peerIdActual = `${peer.username}@${peer.ip}:${peerP2pPort}`; // internal id used for sending
+                        const peerIdDisplay = `${peer.username}@${peer.ip}:${peerHttpPort}`; // shown in UI per request
+
+                        // Map incoming P2P sender address (ip:p2p_port) to username for display
+                        const incomingIpPort = `${peer.ip}:${peerP2pPort}`;
+                        PEER_USERNAME_MAP[incomingIpPort] = peer.username;
+
+                        const li = document.createElement('li');
+                        li.textContent = peerIdDisplay;
+                        // Khi click vào peer, pass display id for UI and actual id for sending
+                        li.onclick = () => setTarget(peerIdDisplay, 'peer', peerIdActual);
+                        peerListElement.appendChild(li);
+                }
             });
         } else if (peerResponse.status === 503) {
             displaySystemMessage(`Peer List Error: ${peerData.message}`);
@@ -406,12 +413,14 @@ async function sendMessage() {
         body.target_type = 'channel'; // CỜ CHẾ ĐỘ KÊNH
         targetName = `#${CURRENT_TARGET_ID}`; // Tên kênh cho thông báo
         
-    } else { // peer (Direct Peer)
-        // Gửi qua WebApp API /send-peer với target_type='peer'
-        url = `${WEAPROUS_BASE_URL}/send-peer`;
-        body.target_id = CURRENT_TARGET_ID; // Peer ID (alice@ip:port)
-        body.target_type = 'peer'; // CỜ CHẾ ĐỘ PEER
-        targetName = CURRENT_TARGET_ID.split('@')[0]; // Lấy username đích
+    } else { // peer (Direct Peer)
+        // Gửi qua WebApp API /send-peer với target_type='peer'
+        url = `${WEAPROUS_BASE_URL}/send-peer`;
+        // Use the internal actual peer id (with p2p port) when sending. If not set,
+        // fall back to the visible CURRENT_TARGET_ID (best-effort).
+        body.target_id = CURRENT_TARGET_INTERNAL_ID || CURRENT_TARGET_ID; // Peer ID (username@ip:p2p_port)
+        body.target_type = 'peer'; // CỜ CHẾ ĐỘ PEER
+        targetName = (CURRENT_TARGET_ID || body.target_id).split('@')[0]; // Lấy username đích
     }
 
     try {
@@ -457,23 +466,56 @@ async function startPollingForNewMessages() {
             if (response.ok) {
                 const data = await response.json();
                 
-                data.messages.forEach(msg => {
-                    // msg.message hiện tại sẽ là: "[USERNAME] message content"
-                    const contentMatch = msg.message.match(/\[(.*?)\] (.*)/);
-                    
-                    let sender = contentMatch ? contentMatch[1] : msg.sender_addr; 
-                    let content = contentMatch ? contentMatch[2].trim() : msg.message;
-                    
-                    // Giả định nếu không match, đó là tin nhắn P2P thô hoặc Broadcast cũ
-                    let type = 'received';
-                    
-                    displayMessage(sender, content, type, 'peer'); 
-                    
-                    // LOGIC THÔNG BÁO NHẬN TIN NHẮN (BÊN NHẬN)
-                    // Sử dụng sender đã được tra cứu (username) hoặc sender_addr
-                    let displaySender = PEER_USERNAME_MAP[msg.sender_addr] || sender;
-                    displayNotification(`New message received from ${displaySender}.`, 'success');
-                });
+                data.messages.forEach(msg => {
+                    const raw = msg.message || '';
+
+                    // Tìm tất cả các nhóm trong ngoặc vuông, ví dụ: "[192.168:8000] [alice] Hello"
+                    const bracketMatches = Array.from(raw.matchAll(/\[([^\]]+)\]/g)).map(m => m[1]);
+
+                    // Regex để xác định ip:port
+                    const ipPortRegex = /^\d+\.\d+\.\d+\.\d+:\d+$/;
+
+                    let sender = null;
+                    let content = raw;
+
+                    // Prefer the network-resolved username (based on msg.sender_addr) when available
+                    const networkName = PEER_USERNAME_MAP[msg.sender_addr];
+
+                    if (networkName) {
+                        sender = networkName;
+                        // Remove any occurrence of [networkName] from the raw content, if present
+                        content = raw.replace(new RegExp('\\[' + escapeRegExp(networkName) + '\\]', 'g'), '').trim();
+                        // Also remove any leftover leading bracketed token (e.g., an ip:port) at the start
+                        content = content.replace(/^\s*\[[^\]]+\]\s*/, '');
+                    } else if (bracketMatches.length === 0) {
+                        // No brackets and no network mapping -> fallback to sender_addr
+                        sender = msg.sender_addr;
+                        content = raw;
+                    } else {
+                        // No network mapping; pick a non-ip bracket if available, else first bracket
+                        let chosen = bracketMatches.find(b => !ipPortRegex.test(b));
+                        if (!chosen) chosen = bracketMatches[0];
+
+                        if (!ipPortRegex.test(chosen)) {
+                            sender = chosen;
+                            // Remove only that chosen bracket occurrence
+                            content = raw.replace(new RegExp('\\[' + escapeRegExp(chosen) + '\\]', ''), '').trim();
+                            content = content.replace(/^\s*\[[^\]]+\]\s*/, '');
+                        } else {
+                            // chosen is ip:port -> use msg.sender_addr mapping fallback
+                            sender = msg.sender_addr;
+                            const afterFirst = raw.replace(/^[^\]]*\]\s*/, '');
+                            content = afterFirst.trim();
+                        }
+                    }
+
+                    let type = 'received';
+                    displayMessage(sender, content, type, 'peer');
+
+                    // Thông báo sử dụng tên (nếu có mapping) hoặc sender
+                    let displaySender = typeof sender === 'string' ? (PEER_USERNAME_MAP[msg.sender_addr] || sender) : sender;
+                    displayNotification(`New message received from ${displaySender}.`, 'success');
+                });
             }
         } catch (error) {
             // Suppress error to avoid constant popups
@@ -497,20 +539,33 @@ function displayMessage(sender, content, type, targetType) {
         displaySender = MY_USERNAME;
     }
     
-    // 2. Logic Hiển thị
-    const msgDiv = document.createElement('div');
-    msgDiv.classList.add('message-bubble', type);
-    
-    // Xử lý Broadcast
-    if (content.startsWith('📢 Broadcast:')) {
-         displaySender = content.substring(content.indexOf('[')+1, content.indexOf(']'));
-         content = content.substring(content.indexOf(']')+1).trim();
-    }
-    
-    msgDiv.innerHTML = `<strong>${displaySender}:</strong> ${content}`; 
+    // 2. Logic Hiển thị
+    const msgDiv = document.createElement('div');
+    msgDiv.classList.add('message-bubble', type);
+
+    // Xử lý Broadcast (giữ nguyên logic hiện có)
+    let isBroadcast = false;
+    if (content.startsWith('📢 Broadcast:')) {
+        isBroadcast = true;
+        displaySender = content.substring(content.indexOf('[')+1, content.indexOf(']'));
+        content = content.substring(content.indexOf(']')+1).trim();
+    }
+
+    // Bỏ [username] đứng đầu nội dung (ví dụ: "[alice] Hello" -> "Hello")
+    // Điều này loại bỏ nhãn người nhận phía trước nội dung kênh/peer khi hiển thị.
+    content = content.replace(/^\s*\[[^\]]+\]\s*/, '');
+
+    // Nếu là Broadcast, thêm icon trước tên người gửi để hiển thị biểu tượng loa
+    const senderLabel = isBroadcast ? `📢 ${displaySender}` : displaySender;
+    msgDiv.innerHTML = `<strong>${senderLabel}:</strong> ${content}`;
     
     window.appendChild(msgDiv);
     window.scrollTop = window.scrollHeight; 
+}
+
+// Escape string for RegExp construction
+function escapeRegExp(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function displaySystemMessage(message) {
